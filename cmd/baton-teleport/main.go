@@ -27,6 +27,7 @@ func main() {
 	}
 
 	cmd.Version = version
+	cmdFlags(cmd)
 
 	err = cmd.Execute()
 	if err != nil {

@@ -53,6 +53,22 @@ baton resources
 - Organizations
 - Roles
 
+# Connecting and logging your teleport cluster
+
+tsh login --proxy=d3v-conductorone.teleport.sh --user=miguel.angel.chavez.martinez@gmail.com
+
+# Generating auth file using tctl
+
+tctl auth sign --user=miguel.angel.chavez.martinez@gmail.com --out=auth.pem --ttl=2h
+
+# Exporting auth file
+
+export TELEPORT_IDENTITY=$(cat uath.pem)
+
+# Generating certificates using tctl
+
+tctl auth sign --format=tls --user=miguel.angel.chavez.martinez@gmail.com --out=cert --ttl=2h
+
 # Contributing, Support, and Issues
 
 We started Baton because we were tired of taking screenshots and manually building spreadsheets. We welcome contributions, and ideas, no matter how small -- our goal is to make identity and permissions sprawl less painful for everyone. If you have questions, concerns, or ideas: Please open a Github Issue!
