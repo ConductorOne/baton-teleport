@@ -9,12 +9,15 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/conductorone/baton-teleport/pkg/client"
+	"github.com/gravitational/teleport/api/types"
 )
 
 type userBuilder struct {
 	resourceType *v2.ResourceType
 	client       *client.TeleportClient
 }
+
+var mapUsers = make(map[string]User)
 
 type User struct {
 	Name   string
@@ -23,8 +26,6 @@ type User struct {
 	Roles  []string
 	Traits map[string][]string
 }
-
-var mapUsers = make(map[string]User)
 
 func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return userResourceType
@@ -60,27 +61,31 @@ func userResource(ctx context.Context, pId *v2.ResourceId, user *User) (*v2.Reso
 	return resource, nil
 }
 
+func addUsers(users []types.User) {
+	for _, user := range users {
+		mapUsers[user.GetName()] = User{
+			Name:   user.GetName(),
+			Email:  user.GetName(),
+			Kind:   user.GetKind(),
+			Roles:  user.GetRoles(),
+			Traits: user.GetTraits(),
+		}
+	}
+}
+
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
 func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+	var rv []*v2.Resource
 	if len(mapUsers) == 0 {
 		users, err := u.client.GetUsers(ctx)
 		if err != nil {
 			return nil, "", nil, err
 		}
 
-		for _, user := range users {
-			mapUsers[user.GetName()] = User{
-				Name:   user.GetName(),
-				Email:  user.GetName(),
-				Kind:   user.GetKind(),
-				Roles:  user.GetRoles(),
-				Traits: user.GetTraits(),
-			}
-		}
+		addUsers(users)
 	}
 
-	var rv []*v2.Resource
 	for _, userEntry := range mapUsers {
 		userEntryCopy := userEntry
 

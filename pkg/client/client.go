@@ -57,5 +57,4 @@ func (t *TeleportClient) GetRoles(ctx context.Context) ([]types.Role, error) {
 	}
 
 	return roles, nil
-
 }

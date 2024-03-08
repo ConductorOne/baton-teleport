@@ -2,15 +2,21 @@ package connector
 
 import (
 	"context"
+	"fmt"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
+
+	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
+	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/conductorone/baton-teleport/pkg/client"
 )
 
-type roleResourceType struct {
+const roleMembership = "member"
+
+type roleBuilder struct {
 	resourceType *v2.ResourceType
 	client       *client.TeleportClient
 }
@@ -22,7 +28,7 @@ type Role struct {
 
 var mapRoles = make(map[string]Role)
 
-func (r *roleResourceType) ResourceType(_ context.Context) *v2.ResourceType {
+func (r *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return r.resourceType
 }
 
@@ -39,7 +45,7 @@ func getRoleResource(role *Role) (*v2.Resource, error) {
 
 	ret, err := rs.NewRoleResource(
 		role.Name,
-		resourceTypeRole,
+		roleResourceType,
 		role.Id,
 		roleTraitOptions,
 	)
@@ -52,18 +58,20 @@ func getRoleResource(role *Role) (*v2.Resource, error) {
 
 // List returns all the roles from the database as resource objects.
 // Roles include a RoleTrait because they are the 'shape' of a standard group.
-func (r *roleResourceType) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
 
-	roles, err := r.client.GetRoles(ctx)
-	if err != nil {
-		return nil, "", nil, err
-	}
+	if len(mapRoles) == 0 {
+		roles, err := r.client.GetRoles(ctx)
+		if err != nil {
+			return nil, "", nil, err
+		}
 
-	for _, role := range roles {
-		mapRoles[role.GetName()] = Role{
-			Name: role.GetName(),
-			Id:   role.GetName(),
+		for _, role := range roles {
+			mapRoles[role.GetName()] = Role{
+				Name: role.GetName(),
+				Id:   role.GetName(),
+			}
 		}
 	}
 
@@ -79,25 +87,64 @@ func (r *roleResourceType) List(ctx context.Context, parentId *v2.ResourceId, to
 	return rv, "", nil, nil
 }
 
-func (r *roleResourceType) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (r *roleBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+	var rv []*v2.Entitlement
+	assignmentOptions := []ent.EntitlementOption{
+		ent.WithGrantableTo(userResourceType),
+		ent.WithDisplayName(fmt.Sprintf("%s Role %s", resource.DisplayName, roleMembership)),
+		ent.WithDescription(fmt.Sprintf("Member of %s Teleport role", resource.DisplayName)),
+	}
+
+	rv = append(rv, ent.NewAssignmentEntitlement(
+		resource,
+		roleMembership,
+		assignmentOptions...,
+	))
+
+	return rv, "", nil, nil
 }
 
-func (r *roleResourceType) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+	var rv []*v2.Grant
+	if len(mapUsers) == 0 {
+		users, err := r.client.GetUsers(ctx)
+		if err != nil {
+			return nil, "", nil, err
+		}
+
+		addUsers(users)
+	}
+
+	for _, userEntry := range mapUsers {
+		userEntryCopy := userEntry
+		ur, err := userResource(ctx, resource.Id, &userEntryCopy)
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("error creating user resource for role %s: %w", resource.Id.Resource, err)
+		}
+
+		for _, role := range userEntry.Roles {
+			if role != resource.Id.Resource {
+				continue
+			}
+			gr := grant.NewGrant(resource, roleMembership, ur.Id)
+			rv = append(rv, gr)
+		}
+	}
+
+	return rv, "", nil, nil
 }
 
-func (r *roleResourceType) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
+func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	return nil, nil
 }
 
-func (r *roleResourceType) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
+func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
 	return nil, nil
 }
 
-func newRoleBuilder(c *client.TeleportClient) *roleResourceType {
-	return &roleResourceType{
-		resourceType: resourceTypeRole,
+func newRoleBuilder(c *client.TeleportClient) *roleBuilder {
+	return &roleBuilder{
+		resourceType: roleResourceType,
 		client:       c,
 	}
 }
