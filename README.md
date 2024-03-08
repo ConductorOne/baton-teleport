@@ -58,7 +58,7 @@ baton resources
 tsh login --proxy=d3v-conductorone.teleport.sh --user=miguel.angel.chavez.martinez@gmail.com
 
 # Generating auth file using tctl
-
+TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=30h --user=miguel.angel.chavez.martinez@gmail.com --out=user.pem 
 tctl auth sign --user=miguel.angel.chavez.martinez@gmail.com --out=auth.pem --ttl=2h
 
 # Exporting auth file
