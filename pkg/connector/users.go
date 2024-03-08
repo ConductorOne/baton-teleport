@@ -24,17 +24,6 @@ type User struct {
 	Traits map[string][]string
 }
 
-// const (
-// 	// Assign proxyAddr to the host and port of your Teleport Proxy Service instance
-// 	proxyAddr      string = "d3v-conductorone.teleport.sh:443"
-// 	initTimeout           = time.Duration(10) * time.Second
-// 	updateInterval        = time.Duration(5) * time.Second
-// 	tokenTTL              = time.Duration(5) * time.Minute
-// 	networkName    string = "bridge"
-// 	managementPort string = "15672"
-// 	tokenLenBytes         = 16
-// )
-
 var mapUsers = make(map[string]User)
 
 func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -73,9 +62,9 @@ func userResource(ctx context.Context, pId *v2.ResourceId, user *User) (*v2.Reso
 
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
-func (o *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	if len(mapUsers) == 0 {
-		users, err := o.client.GetUsers(ctx)
+		users, err := u.client.GetUsers(ctx)
 		if err != nil {
 			return nil, "", nil, err
 		}

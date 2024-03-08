@@ -11,8 +11,7 @@ import (
 )
 
 type Teleport struct {
-	client    *client.TeleportClient
-	proxyAddr string
+	client *client.TeleportClient
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
@@ -49,7 +48,6 @@ func New(ctx context.Context, proxyAddr string) (*Teleport, error) {
 		return nil, err
 	}
 	return &Teleport{
-		client:    tc,
-		proxyAddr: proxyAddr,
+		client: tc,
 	}, nil
 }

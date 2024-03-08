@@ -10,15 +10,16 @@ import (
 )
 
 type TeleportClient struct {
-	client *teleport.Client
+	client    *teleport.Client
+	ProxyAddr string
 }
 
-const (
-	initTimeout = time.Duration(10) * time.Second
-)
+const initTimeout = time.Duration(10) * time.Second
 
 func New(ctx context.Context, proxyAddr string) (*TeleportClient, error) {
-	tc := &TeleportClient{}
+	tc := &TeleportClient{
+		ProxyAddr: proxyAddr,
+	}
 	ctx, cancel := context.WithTimeout(ctx, initTimeout)
 	defer cancel()
 	creds := teleport.LoadIdentityFile("auth.pem")
