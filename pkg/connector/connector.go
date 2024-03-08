@@ -18,6 +18,7 @@ type Teleport struct {
 func (d *Teleport) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
 	return []connectorbuilder.ResourceSyncer{
 		newUserBuilder(d.client),
+		newRoleBuilder(d.client),
 	}
 }
 
