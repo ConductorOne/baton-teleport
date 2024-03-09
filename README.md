@@ -11,7 +11,7 @@ As part of becoming a teleport developer partner, teleport sponsors an instance 
 Unlike a trial account, a sponsored account does not expire after 14 days.
 ## Prerequisites
 
-1. teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
+1. Teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
 2. Application Scopes: 
   - users
   - roles
