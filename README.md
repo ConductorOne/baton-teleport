@@ -14,9 +14,8 @@ Unlike a trial account, a sponsored account does not expire after 14 days.
 1. teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
 2. Authentication method set to `Token access`
 3. Application Scopes: 
-  - members
-  - groups
-  - organizations
+  - users
+  - roles
   - grant resources
   - revoke resources
 
@@ -53,7 +52,7 @@ baton resources
 
 # Running a teleport instance
 
-## Replace `<email>` and `<cluster_name>` with your cluster credentials provided by teleport
+### Replace `<email>` and `<cluster_name>` with your cluster credentials provided by teleport
 ```
 1.- Add teleport yaml file
 sudo teleport configure -o file \
