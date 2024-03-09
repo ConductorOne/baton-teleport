@@ -41,16 +41,14 @@ docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c
 go install github.com/conductorone/baton/cmd/baton@main
 go install github.com/conductorone/baton-teleport/cmd/baton-teleport@main
 
-BATON_SUBDOMAIN=clientSubdomain BATON_EMAIL=clientEmail BATON_API_TOKEN=apiToken 
+BATON_PROXYADDR=clientProxy baton-teleport 
 baton resources
 ```
 
 # Data Model
 
 `baton-teleport` pulls down information about the following teleport resources:
-- Team Members
-- Groups
-- Organizations
+- Users
 - Roles
 
 # Running a teleport instance
