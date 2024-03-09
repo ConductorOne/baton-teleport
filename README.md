@@ -12,8 +12,7 @@ Unlike a trial account, a sponsored account does not expire after 14 days.
 ## Prerequisites
 
 1. teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
-2. Authentication method set to `Token access`
-3. Application Scopes: 
+2. Application Scopes: 
   - users
   - roles
   - grant resources
@@ -30,7 +29,7 @@ baton resources
 ## docker
 
 ```
-docker run --rm -v $(pwd):/out -e BATON_SUBDOMAIN=clientSubdomain BATON_EMAIL=clientEmail BATON_API_TOKEN=apiToken ghcr.io/conductorone/baton-teleport:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out -e BATON_PROXYADDR=clientProxy ghcr.io/conductorone/baton-teleport:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
@@ -52,20 +51,20 @@ baton resources
 
 # Running a teleport instance
 
-### Replace `<email>` and `<cluster_name>` with your cluster credentials provided by teleport
+### Replace `<email>` and `<cluster_name>` with your cluster credentials
 ```
-1.- Add teleport yaml file
+1. Add teleport yaml file
 sudo teleport configure -o file \
 --acme --acme-email=<email> \
 --cluster-name=<cluster_name>
 
-2.- Start teleport using our previous yaml file
+2. Start teleport using our previous yaml file
 sudo teleport start --config="/etc/teleport.yaml"
 
-3.- Logging your teleport cluster
+3. Logging your teleport cluster
 tsh login --proxy=<cluster_name> --user=<email>
 
-4.- Generating auth.pem file using tctl
+4. Generating auth.pem file using tctl
 TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email> --out=auth.pem
 ```
 
