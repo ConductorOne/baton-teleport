@@ -53,31 +53,24 @@ baton resources
 - Organizations
 - Roles
 
+# Running a teleport instance
 
-## Running a teleport instance
-
-# Add teleport yaml file
+## Replace `<email>` and `<cluster_name>` with your cluster credentials provided by teleport
+```
+1.- Add teleport yaml file
 sudo teleport configure -o file \
---acme --acme-email=miguel.angel.chavez.martinez@gmail.com \
---cluster-name=d3v-conductorone.teleport.sh
+--acme --acme-email=<email> \
+--cluster-name=<cluster_name>
 
-# Starting teleport using yaml file
+2.- Start teleport using our previous yaml file
 sudo teleport start --config="/etc/teleport.yaml"
 
-# Connecting and logging your teleport cluster
-tsh login --proxy=d3v-conductorone.teleport.sh --user=miguel.angel.chavez.martinez@gmail.com
+3.- Logging your teleport cluster
+tsh login --proxy=<cluster_name> --user=<email>
 
-# Generating token with roles
-sudo tctl tokens add --type=node,app
-
-# Generating auth.pem file using tctl
-TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=miguel.angel.chavez.martinez@gmail.com --out=auth.pem
-
-# Exporting auth file
-export TELEPORT_IDENTITY=$(cat uath.pem)
-
-# Generating certificates using tctl
-TELEPORT_CONFIG_FILE="" tctl auth sign --format=tls --user=miguel.angel.chavez.martinez@gmail.com --out=cert --ttl=2h
+4.- Generating auth.pem file using tctl
+TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email> --out=auth.pem
+```
 
 # Contributing, Support, and Issues
 
