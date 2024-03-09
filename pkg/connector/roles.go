@@ -7,6 +7,9 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
+	"github.com/gravitational/teleport/api/types"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
@@ -60,18 +63,15 @@ func getRoleResource(role *Role) (*v2.Resource, error) {
 // Roles include a RoleTrait because they are the 'shape' of a standard group.
 func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
+	roles, err := r.client.GetRoles(ctx)
+	if err != nil {
+		return nil, "", nil, err
+	}
 
-	if len(mapRoles) == 0 {
-		roles, err := r.client.GetRoles(ctx)
-		if err != nil {
-			return nil, "", nil, err
-		}
-
-		for _, role := range roles {
-			mapRoles[role.GetName()] = Role{
-				Name: role.GetName(),
-				Id:   role.GetName(),
-			}
+	for _, role := range roles {
+		mapRoles[role.GetName()] = Role{
+			Name: role.GetName(),
+			Id:   role.GetName(),
 		}
 	}
 
@@ -135,10 +135,95 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 }
 
 func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+	userName := principal.Id.Resource
+	roleName := entitlement.Resource.Id.Resource
+
+	if principal.Id.ResourceType != userResourceType.Id {
+		l.Warn(
+			"baton-teleport: only users can be granted role membership",
+			zap.String("principal_type", principal.Id.ResourceType),
+			zap.String("principal_id", principal.Id.Resource),
+		)
+		return nil, fmt.Errorf("baton-teleport: only users can be granted role membership")
+	}
+
+	// Create an MFA required role for "prod" nodes.
+	prodRole, err := types.NewRole(roleName, types.RoleSpecV6{
+		Options: types.RoleOptions{
+			RequireMFAType: types.RequireMFAType_SESSION,
+		},
+		Allow: types.RoleConditions{
+			Logins:     []string{userName},
+			NodeLabels: types.Labels{},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := r.client.GetUser(ctx, userName)
+	if err != nil {
+		return nil, err
+	}
+
+	user.SetLogins(append(user.GetLogins(), userName))
+	user.AddRole(prodRole.GetName())
+	updatedUser, err := r.client.UpdateUserRole(ctx, user)
+	if err != nil {
+		return nil, fmt.Errorf("teleport-connector: failed to add role: %s", err.Error())
+	}
+
+	l.Warn("Role Membership has been created.",
+		zap.String("Name", updatedUser.GetName()),
+		zap.String("Namespace", updatedUser.GetMetadata().Namespace),
+		zap.Time("CreatedAt", updatedUser.GetCreatedBy().Time),
+	)
+
 	return nil, nil
 }
 
 func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+	var roleList []string
+	entitlement := grant.Entitlement
+	principal := grant.Principal
+
+	if principal.Id.ResourceType != userResourceType.Id {
+		l.Warn(
+			"baton-teleport: only users can have role membership revoked",
+			zap.String("principal_type", principal.Id.ResourceType),
+			zap.String("principal_id", principal.Id.Resource),
+		)
+		return nil, fmt.Errorf("teleport-connector: only users can have role membership revoked")
+	}
+
+	roleName := entitlement.Resource.Id.Resource
+	userName := principal.Id.Resource
+	user, err := r.client.GetUser(ctx, userName)
+	if err != nil {
+		return nil, err
+	}
+
+	user.SetLogins(append(user.GetLogins(), userName))
+	for _, role := range user.GetRoles() {
+		if role != roleName {
+			roleList = append(roleList, role)
+		}
+	}
+
+	user.SetRoles(roleList)
+	updatedUser, err := r.client.UpdateUserRole(ctx, user)
+	if err != nil {
+		return nil, fmt.Errorf("teleport-connector: failed to revoke role: %s", err.Error())
+	}
+
+	l.Warn("Role Membership has been revoked.",
+		zap.String("Name", updatedUser.GetName()),
+		zap.String("Namespace", updatedUser.GetMetadata().Namespace),
+		zap.Time("CreatedAt", updatedUser.GetCreatedBy().Time),
+	)
+
 	return nil, nil
 }
 

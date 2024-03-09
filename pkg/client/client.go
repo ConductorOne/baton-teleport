@@ -58,3 +58,23 @@ func (t *TeleportClient) GetRoles(ctx context.Context) ([]types.Role, error) {
 
 	return roles, nil
 }
+
+// GetUser gets an user.
+func (t *TeleportClient) GetUser(ctx context.Context, username string) (types.User, error) {
+	user, err := t.client.GetUser(ctx, username, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// UpdateUserRole updates an user.
+func (t *TeleportClient) UpdateUserRole(ctx context.Context, user types.User) (types.User, error) {
+	updatedUser, err := t.client.UpdateUser(ctx, user.(*types.UserV2))
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedUser, nil
+}
