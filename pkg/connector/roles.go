@@ -35,7 +35,7 @@ func (r *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return r.resourceType
 }
 
-// Create a new connector resource for a Datadog role.
+// Create a new connector resource for a Teleport role.
 func getRoleResource(role *Role) (*v2.Resource, error) {
 	profile := map[string]interface{}{
 		"role_name": role.Name,
@@ -60,7 +60,7 @@ func getRoleResource(role *Role) (*v2.Resource, error) {
 }
 
 // List returns all the roles from the database as resource objects.
-// Roles include a RoleTrait because they are the 'shape' of a standard group.
+// Roles include a RoleTrait because they are the 'shape' of a standard role.
 func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
 	roles, err := r.client.GetRoles(ctx)
