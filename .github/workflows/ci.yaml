@@ -63,7 +63,7 @@ jobs:
       - name: check tsh version
         run: tsh version 
       - name: check tctl version
-        run: tctl vesion
+        run: tctl version
       - name: Add teleport.yaml
         run: teleport configure -o file \
             --acme --acme-email=BATON_EMAIL \
