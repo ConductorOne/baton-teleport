@@ -61,6 +61,8 @@ jobs:
         uses: teleport-actions/setup@v1
         with:
           version: 14.0.0
+      - name: Enable anonymous telemetry
+        run: export TELEPORT_ANONYMOUS_TELEMETRY=1
       - name: Create a bot
         run: tbot start --destination-dir=./tbot-user --token=00000000000000000000000000000000 --ca-pin=sha256:abdc1245efgh5678abdc1245efgh5678abdc1245efgh5678abdc1245efgh5678 --auth-server=d3v-conductorone.teleport.sh:3025
       # - name: check tsh version
