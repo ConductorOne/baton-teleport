@@ -61,20 +61,20 @@ jobs:
         uses: teleport-actions/setup@v1
         with:
           version: 14.0.0
-      - name: start tsh 
-        run: |
-              tsh login --proxy=d3v-conductorone.teleport.sh --user=BATON_EMAIL
-              tctl status
+      # - name: start tsh 
+      #   run: |
+      #         tsh login --proxy=d3v-conductorone.teleport.sh --user=BATON_EMAIL
+      #         tctl status
+      - name: Authorize against Teleport
+        id: auth
+        uses: teleport-actions/auth@v2
+        with:
+          proxy: d3v-conductorone.teleport.sh:443
+          token: 00000000000000000000000000000000
+          certificate-ttl: 1h
+          anonymous-telemetry: 1
       - name: Create bot-token
         run: tctl create -f bot-token.yaml
-      # - name: Authorize against Teleport
-      #   id: auth
-      #   uses: teleport-actions/auth@v2
-      #   with:
-      #     proxy: d3v-conductorone.teleport.sh:443
-      #     token: 00000000000000000000000000000000
-      #     certificate-ttl: 1h
-      #     anonymous-telemetry: 1
       # - name: Enable anonymous telemetry
       #   run: export TELEPORT_ANONYMOUS_TELEMETRY=1
       # - name: Create a bot
