@@ -45,6 +45,7 @@ jobs:
       # able to authenticate with the cluster.
       id-token: write
       contents: read
+      pages: write
     runs-on: ubuntu-latest
     env:
       BATON_LOG_LEVEL: debug
@@ -66,39 +67,20 @@ jobs:
         uses: teleport-actions/setup@v1
         with:
           version: 15.1.1
-      # - name: start tsh 
-      #   run: |
-      #         tsh login --proxy=d3v-conductorone.teleport.sh --user=BATON_EMAIL
-      #         tctl status
       - name: Fetch credentials using Machine ID
         id: auth
         uses: teleport-actions/auth@v2
         with:
-          # Use the address of the auth/proxy server for your own cluster.
           proxy: d3v-conductorone.teleport.sh:443
-          # Use the name of the join token resource you created in step 1.
-          token: example-bot
-          # Specify the length of time that the generated credentials should be
-          # valid for. This is optional and defaults to "1h"
-          certificate-ttl: 1h
+          token: github-actions-cd
           # Enable the submission of anonymous usage telemetry. This
           # helps us shape the future development of `tbot`. You can disable this
           # by omitting this.
           anonymous-telemetry: 1
-      - name: Create bot-token
-        run: tctl create -f bot-token.yaml
-      # - name: Enable anonymous telemetry
-      #   run: export TELEPORT_ANONYMOUS_TELEMETRY=1
-      # - name: Create a bot
-      #   run: tbot start --destination-dir=./tbot-user --token=00000000000000000000000000000000 --ca-pin=sha256:abdc1245efgh5678abdc1245efgh5678abdc1245efgh5678abdc1245efgh5678 --auth-server=d3v-conductorone.teleport.sh:3025
-      # - name: check tsh version
-      #   run: tsh version 
-      # - name: check tctl version
-      #   run: tctl version
-      # - name: Add teleport.yaml
-      #   run: sudo teleport configure -o file --acme --acme-email=BATON_EMAIL --cluster-name=BATON_PROXYADDR
-      # - name: Running Teleport
-      #   run: sudo teleport start --config="/etc/teleport.yaml"
+      - name: List nodes (tsh)
+        # Enters a command from the cluster, in this case "tsh ls" using Machine
+        # ID credentials to list remote SSH nodes.
+        run: tsh ls
       - name: Build baton-teleport
         run: go build ./cmd/baton-teleport
       # - name: Run baton-teleport
