@@ -78,9 +78,9 @@ jobs:
         run: tsh ls
       - name: Build baton-teleport
         run: go build ./cmd/baton-teleport
-      - name: Check tsh and tctl statuses
-        run: |
-          tsh status
+      - name: Check tsh status
+        run: tsh status
+      - name: Check tctl status
           tctl status
       # - name: Run baton-teleport
       #   run: ./baton-teleport --proxyAddr d3v-conductorone.teleport.sh
