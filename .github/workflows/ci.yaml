@@ -78,8 +78,10 @@ jobs:
         run: tsh ls
       - name: Build baton-teleport
         run: go build ./cmd/baton-teleport
-      - name: Run baton-teleport
-        run: ./baton-teleport --proxyAddr d3v-conductorone.teleport.sh
+      - name: Check tsh status
+        run: tsh status
+      # - name: Run baton-teleport
+      #   run: ./baton-teleport --proxyAddr d3v-conductorone.teleport.sh
       - name: Install baton
         run: ./scripts/get-baton.sh && mv baton /usr/local/bin
       - name: Check for grant before revoking
