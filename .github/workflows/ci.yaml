@@ -84,8 +84,12 @@ jobs:
         run: tctl status
       - name: Print identity file
         run: cat ${{ steps.auth.outputs.identity-file }}
-      - name: Trying auth file
-        run: tctl auth sign --user github-actions-cd --out auth.pem --ttl 720h
+      - name: List all nodes
+        run: tsh -i ${{ steps.auth.outputs.identity-file }} ls
+      - name: List all applications
+        run: tsh -i ${{ steps.auth.outputs.identity-file }} app ls
+      # - name: Trying auth file
+      #   run: tctl auth sign --user github-actions-cd --out auth.pem --ttl 720h
       # - name: cred
       #   run: tsh login --user=miguel.angel.chavez.martinez@gmail.com --out=test.pem --proxy=3v-conductorone.teleport.sh:443
       # - name: Generte credentials
