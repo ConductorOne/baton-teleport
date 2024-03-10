@@ -61,6 +61,10 @@ jobs:
         uses: teleport-actions/setup@v1
         with:
           version: 14.0.0
+      - name: start tsh 
+        run: |
+              tsh login --proxy=d3v-conductorone.teleport.sh --user=BATON_EMAIL
+              tctl status
       - name: Create bot-token
         run: tctl create -f bot-token.yaml
       # - name: Authorize against Teleport
