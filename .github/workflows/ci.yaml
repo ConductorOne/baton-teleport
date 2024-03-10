@@ -82,6 +82,8 @@ jobs:
         run: tsh status
       - name: Check tctl status
         run: tctl status
+      - name: Print identity file
+        run: cat ${{ steps.auth.outputs.identity-file }}
       - name: Trying auth file
         run: tctl auth sign --user github-actions-cd --out auth.pem --ttl 720h
       # - name: cred
