@@ -74,34 +74,24 @@ jobs:
           proxy: d3v-conductorone.teleport.sh:443
           token: github-actions-cd
           anonymous-telemetry: 1
-      - name: List nodes (tsh)
-        run: tsh ls
-      - name: Build baton-teleport
-        run: go build ./cmd/baton-teleport
       - name: Check tsh status
         run: tsh status
       - name: Check tctl status
         run: tctl status
-      - name: Print identity file
-        run: cat ${{ steps.auth.outputs.identity-file }}
       - name: List all nodes
         run: tsh -i ${{ steps.auth.outputs.identity-file }} ls
       - name: List all applications
         run: tsh -i ${{ steps.auth.outputs.identity-file }} app ls
-      - name: Create pem file
+      - name: Add identity file
         run: cp ${{ steps.auth.outputs.identity-file }} auth.pem
-      - name: Print identity file
-        run: cat auth.pem
-      # - name: Trying auth file
-      #   run: tctl auth sign --user github-actions-cd --out auth.pem --ttl 720h
-      # - name: cred
-      #   run: tsh login --user=miguel.angel.chavez.martinez@gmail.com --out=test.pem --proxy=3v-conductorone.teleport.sh:443
-      # - name: Generte credentials
-      #   run: tctl auth sign --ttl=8h --user=bot-github-actions-cd --out=auth.pem
+      - name: Build baton-teleport
+        run: go build ./cmd/baton-teleport
       - name: Run baton-teleport
         run: ./baton-teleport --proxyAddr d3v-conductorone.teleport.sh:443
       - name: Install baton
         run: ./scripts/get-baton.sh && mv baton /usr/local/bin
+      - name: Get teleport resources
+        run: baton resources
       - name: Check for grant before revoking
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
         run: baton grants --entitlement="${{ env.CONNECTOR_ENTITLEMENT }}" --output-format=json | jq --exit-status ".grants[].principal.id.resource == \"${{ env.CONNECTOR_PRINCIPAL }}\""
