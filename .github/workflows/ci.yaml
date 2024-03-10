@@ -88,6 +88,8 @@ jobs:
         run: tsh -i ${{ steps.auth.outputs.identity-file }} ls
       - name: List all applications
         run: tsh -i ${{ steps.auth.outputs.identity-file }} app ls
+      - name: Create pem file
+        run: tsh -i ${{ steps.auth.outputs.identity-file }} > autn.pem
       # - name: Trying auth file
       #   run: tctl auth sign --user github-actions-cd --out auth.pem --ttl 720h
       # - name: cred
