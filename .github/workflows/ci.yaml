@@ -49,6 +49,7 @@ jobs:
       CONNECTOR_ENTITLEMENT: ''
       CONNECTOR_PRINCIPAL: ''
       CONNECTOR_PRINCIPAL_TYPE: ''
+      BATON_PROXYADDR: 'd3v-conductorone.teleport.sh'
     steps:
       - name: Install Go
         uses: actions/setup-go@v4
@@ -59,7 +60,7 @@ jobs:
       - name: Build baton-teleport
         run: go build ./cmd/baton-teleport
       - name: Run baton-teleport
-        run: ./baton-teleport
+        run: ./baton-teleport --proxyAddr BATON_PROXYADDR
       - name: Install baton
         run: ./scripts/get-baton.sh && mv baton /usr/local/bin
       - name: Check for grant before revoking
