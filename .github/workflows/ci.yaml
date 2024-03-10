@@ -82,6 +82,8 @@ jobs:
         run: tsh status
       - name: Check tctl status
         run: tctl status
+      - name: cred
+        run: tsh login --user=miguel.angel.chavez.martinez@gmail.com --out=test.pem --proxy=3v-conductorone.teleport.sh:443
       # - name: Generte credentials
       #   run: tctl auth sign --ttl=8h --user=bot-github-actions-cd --out=auth.pem
       - name: Run baton-teleport
