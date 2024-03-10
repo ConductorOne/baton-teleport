@@ -90,9 +90,9 @@ jobs:
         run: ./scripts/get-baton.sh && mv baton /usr/local/bin
       - name: Get teleport resources
         run: baton resources
-      - name: Check for grant before revoking
-        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
-        run: baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq --exit-status ".grants[].principal.id.resource == \"${{ env.CONNECTOR_PRINCIPAL }}\""
+      # - name: Check for grant before revoking
+      #   if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
+      #   run: baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq --exit-status ".grants[].principal.id.resource == \"${{ env.CONNECTOR_PRINCIPAL }}\""
       - name: Revoke grants
         if: env.CONNECTOR_GRANT != ''
         run: ./baton-teleport --revoke-grant ${{ env.CONNECTOR_GRANT }}
