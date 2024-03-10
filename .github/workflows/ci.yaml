@@ -83,7 +83,7 @@ jobs:
       - name: Check tctl status
         run: tctl status
       - name: Generte credentials
-        run: TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=BATON_EMAIL --out=auth.pem
+        run: tctl auth sign --ttl=8h --user=bot-github-actions-cd --out=auth.pem
       # - name: Run baton-teleport
       #   run: ./baton-teleport --proxyAddr d3v-conductorone.teleport.sh
       - name: Install baton
