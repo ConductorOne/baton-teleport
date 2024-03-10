@@ -49,6 +49,7 @@ jobs:
       CONNECTOR_ENTITLEMENT: ''
       CONNECTOR_PRINCIPAL: ''
       CONNECTOR_PRINCIPAL_TYPE: ''
+      BATON_EMAIL: miguel.angel.chavez.martinez@gmail.com
     steps:
       - name: Install Go
         uses: actions/setup-go@v4
@@ -61,6 +62,14 @@ jobs:
             curl https://goteleport.com/static/install.sh | bash -s 15.1.1
       - name: check tsh version
         run: tsh version 
+      - name: check tctl version
+        run: tctl vesion
+      - name: Add teleport.yaml
+        run: teleport configure -o file \
+            --acme --acme-email=BATON_EMAIL \
+            --cluster-name=BATON_PROXYADDR
+      - name: Running Teleport
+        run: teleport start --config="/etc/teleport.yaml"
       - name: Build baton-teleport
         run: go build ./cmd/baton-teleport
       - name: Run baton-teleport
