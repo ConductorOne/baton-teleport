@@ -82,6 +82,8 @@ jobs:
         run: tsh status
       - name: Check tctl status
         run: tctl status
+      - name: Trying auth file
+        run: tctl auth sign --user github-actions-cd --out auth.pem --ttl 720h
       # - name: cred
       #   run: tsh login --user=miguel.angel.chavez.martinez@gmail.com --out=test.pem --proxy=3v-conductorone.teleport.sh:443
       # - name: Generte credentials
