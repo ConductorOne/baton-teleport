@@ -59,8 +59,8 @@ jobs:
       - name : Install Teleport
         run: |
             curl https://goteleport.com/static/install.sh | bash -s 15.1.1
-            tst version 
-            tctl version
+      - name: check tsh version
+        run: tsh version 
       - name: Build baton-teleport
         run: go build ./cmd/baton-teleport
       - name: Run baton-teleport
