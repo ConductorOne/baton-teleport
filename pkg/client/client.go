@@ -22,9 +22,7 @@ func New(ctx context.Context, proxyAddr string) (*TeleportClient, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, initTimeout)
 	defer cancel()
-	// creds := teleport.LoadIdentityFile("auth.pem")
-	creds := teleport.LoadProfile("", "")
-
+	creds := teleport.LoadIdentityFile("auth.pem")
 	client, err := teleport.New(ctx, teleport.Config{
 		Addrs:       []string{proxyAddr},
 		Credentials: []teleport.Credentials{creds},
