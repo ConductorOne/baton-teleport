@@ -85,7 +85,7 @@ jobs:
       # - name: Generte credentials
       #   run: tctl auth sign --ttl=8h --user=bot-github-actions-cd --out=auth.pem
       - name: Run baton-teleport
-        run: ./baton-teleport --proxyAddr d3v-conductorone.teleport.sh
+        run: ./baton-teleport --proxyAddr d3v-conductorone.teleport.sh:443
       - name: Install baton
         run: ./scripts/get-baton.sh && mv baton /usr/local/bin
       - name: Check for grant before revoking
