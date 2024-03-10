@@ -82,10 +82,10 @@ jobs:
         run: tsh status
       - name: Check tctl status
         run: tctl status
-      - name: Generte credentials
-        run: tctl auth sign --ttl=8h --user=bot-github-actions-cd --out=auth.pem
-      # - name: Run baton-teleport
-      #   run: ./baton-teleport --proxyAddr d3v-conductorone.teleport.sh
+      # - name: Generte credentials
+      #   run: tctl auth sign --ttl=8h --user=bot-github-actions-cd --out=auth.pem
+      - name: Run baton-teleport
+        run: ./baton-teleport --proxyAddr d3v-conductorone.teleport.sh
       - name: Install baton
         run: ./scripts/get-baton.sh && mv baton /usr/local/bin
       - name: Check for grant before revoking
