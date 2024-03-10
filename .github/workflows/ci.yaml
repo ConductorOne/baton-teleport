@@ -65,9 +65,7 @@ jobs:
       - name: check tctl version
         run: tctl version
       - name: Add teleport.yaml
-        run: teleport configure -o file \
-            --acme --acme-email=BATON_EMAIL \
-            --cluster-name=BATON_PROXYADDR
+        run: teleport configure -o file --acme --acme-email=BATON_EMAIL --cluster-name=BATON_PROXYADDR
       - name: Running Teleport
         run: teleport start --config="/etc/teleport.yaml"
       - name: Build baton-teleport
