@@ -49,7 +49,6 @@ jobs:
       CONNECTOR_ENTITLEMENT: ''
       CONNECTOR_PRINCIPAL: ''
       CONNECTOR_PRINCIPAL_TYPE: ''
-      BATON_PROXYADDR: 'd3v-conductorone.teleport.sh'
     steps:
       - name: Install Go
         uses: actions/setup-go@v4
@@ -57,10 +56,15 @@ jobs:
           go-version: 1.22.x
       - name: Checkout code
         uses: actions/checkout@v3
+      - name : Install Teleport
+        run: |
+            curl https://goteleport.com/static/install.sh | bash -s 15.1.1
+            tst version 
+            tctl version
       - name: Build baton-teleport
         run: go build ./cmd/baton-teleport
       - name: Run baton-teleport
-        run: ./baton-teleport --proxyAddr BATON_PROXYADDR
+        run: ./baton-teleport
       - name: Install baton
         run: ./scripts/get-baton.sh && mv baton /usr/local/bin
       - name: Check for grant before revoking
