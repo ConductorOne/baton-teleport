@@ -1,4 +1,4 @@
-name: ci_teleport
+name: ci
 on: 
   workflow_dispatch:
   pull_request:
@@ -81,7 +81,7 @@ jobs:
       - name: Check tsh status
         run: tsh status
       - name: Check tctl status
-          tctl status
+        run: tctl status
       # - name: Run baton-teleport
       #   run: ./baton-teleport --proxyAddr d3v-conductorone.teleport.sh
       - name: Install baton
