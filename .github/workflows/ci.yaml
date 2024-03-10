@@ -55,6 +55,7 @@ jobs:
       CONNECTOR_ENTITLEMENT: ''
       CONNECTOR_PRINCIPAL: ''
       CONNECTOR_PRINCIPAL_TYPE: ''
+      TELEPORT_PROXY: 'd3v-conductorone.teleport.sh:443'
     steps:
       - name: Install Go
         uses: actions/setup-go@v4
@@ -70,7 +71,7 @@ jobs:
         id: auth
         uses: teleport-actions/auth@v2
         with:
-          proxy: TELEPORT_PROXY
+          proxy: ${{ env.TELEPORT_PROXY }}
           token: github-actions-cd
           anonymous-telemetry: 1
       - name: Check tsh status
