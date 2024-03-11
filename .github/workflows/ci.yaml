@@ -48,7 +48,6 @@ jobs:
     env:
       BATON_LOG_LEVEL: debug
       # The following parameters are passed to grant/revoke commands
-      # Change these to the correct IDs for your test data
       CONNECTOR_GRANT: 'role:requester:member:user:homime2188@sfpixel.com'
       CONNECTOR_ENTITLEMENT: 'role:requester:member'
       CONNECTOR_PRINCIPAL: 'homime2188@sfpixel.com'
@@ -76,10 +75,6 @@ jobs:
         run: tsh status
       - name: Check tctl status
         run: tctl status
-      - name: List all nodes
-        run: tsh -i ${{ steps.auth.outputs.identity-file }} ls
-      - name: List all applications
-        run: tsh -i ${{ steps.auth.outputs.identity-file }} app ls
       - name: Add identity file
         run: cp ${{ steps.auth.outputs.identity-file }} auth.pem
       - name: Build baton-teleport
