@@ -103,7 +103,7 @@ jobs:
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
         run: |
            ./baton-teleport --proxyAddr ${{ env.TELEPORT_PROXY }}
-      #      baton grants --proxyAddr ${{ env.TELEPORT_PROXY }} --entitlement ${{ env.CONNECTOR_ENTITLEMENT }}  --output-format=json | jq --exit-status "if .grants then .grants[]?.principal.id.resource != \"${{ env.CONNECTOR_PRINCIPAL }}\" else . end"
+           baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq -e ".grants | any(.principal.id.resource !=\"${{ env.CONNECTOR_PRINCIPAL }}\")"
       - name: Grant entitlement
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != '' && env.CONNECTOR_PRINCIPAL_TYPE != ''
         run: | 
