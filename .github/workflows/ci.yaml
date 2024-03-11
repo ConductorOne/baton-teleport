@@ -86,14 +86,10 @@ jobs:
       - name: Get baton resources
         run: baton resources
       - name: Check for grant before revoking
-        id: run_tests
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
-        run: 
+        run: |
           ./baton-teleport --proxyAddr ${{ env.TELEPORT_PROXY }} 
           baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq -e ".grants | any(.principal.id.resource ==\"${{ env.CONNECTOR_PRINCIPAL }}\")"
-      - name: output values
-        run: |
-          ${{ steps.run_tests.outputs.value }}
       - name: Revoke grants
         if: env.CONNECTOR_GRANT != ''
         run: |
