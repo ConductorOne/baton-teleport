@@ -90,7 +90,7 @@ jobs:
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
         run: baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq -e ".grants | any(.principal.id.resource ==\"${{ env.CONNECTOR_PRINCIPAL }}\")"
       - name: output values
-        run: ${{ steps.fetchDepth.outputs.value }}
+        run: ${{ steps.fetchGrant.outputs }}
       - name: Revoke grants
         if: env.CONNECTOR_GRANT != ''
         run: |
