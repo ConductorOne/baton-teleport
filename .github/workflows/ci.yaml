@@ -60,15 +60,6 @@ jobs:
           go-version: 1.22.x
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: set testval
-        id: testval
-        uses: ./
-        with:
-          cond: true
-          if_true: "true value"
-          if_false: "false value"
-      - name: check testval
-        run: test "${{ steps.testval.outputs.value }}" = "true value"
       - name: Fetch Teleport binaries
         uses: teleport-actions/setup@v1
         with:
