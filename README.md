@@ -53,23 +53,19 @@ baton resources
 
 ### Replace `<email_account>` and `<cluster_name>` with your cluster credentials
 ```
-1. Add enviroment variables(cluster_name, email)
-  export BATON_PROXYADDR=<cluster_name:443>
-  export BATON_EMAIL=<email_account>
-
-2. Add teleport yaml file
+1. Add teleport yaml file
 sudo teleport configure -o file \
---acme --acme-email=BATON_EMAIL \
---cluster-name=BATON_PROXYADDR
+--acme --acme-email=<email_account> \
+--cluster-name=<cluster_name>
 
-3. Start teleport using our previous yaml file
+2. Start teleport using our previous yaml file
 sudo teleport start --config="/etc/teleport.yaml"
 
-4. Logging your teleport cluster
-tsh login --proxy=BATON_PROXYADDR --user=BATON_EMAIL
+3. Logging your teleport cluster
+tsh login --proxy=<cluster_name> --user=<email_account>
 
-5. Generating auth.pem file using tctl
-TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=BATON_EMAIL --out=auth.pem
+4. Generating auth.pem file using tctl
+TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email_account> --out=auth.pem
 ```
 
 # Contributing, Support, and Issues
