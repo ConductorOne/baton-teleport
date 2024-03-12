@@ -32,7 +32,7 @@ func (n *nodeBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return n.resourceType
 }
 
-// Create a new connector resource for a Teleport role.
+// Create a new connector resource for a Teleport node.
 func getNodeResource(node *Node) (*v2.Resource, error) {
 	profile := map[string]interface{}{
 		"role_name": node.Name,
