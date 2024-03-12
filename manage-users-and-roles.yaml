@@ -1,0 +1,20 @@
+kind: role
+metadata:
+  description: role to manage users & roles 
+  name: manage-users-and-roles
+spec:
+  allow:
+    rules:
+    - resources:
+      - node
+      - user
+      - role
+      - read
+      verbs:
+      - list
+      - create
+      - read
+      - update
+      - delete
+  deny: {}
+version: v4

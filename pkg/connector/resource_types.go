@@ -18,4 +18,8 @@ var (
 			v2.ResourceType_TRAIT_ROLE,
 		},
 	}
+	nodeResourceType = &v2.ResourceType{
+		Id:          "node",
+		DisplayName: "Node",
+	}
 )

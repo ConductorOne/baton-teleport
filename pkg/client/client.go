@@ -5,6 +5,7 @@ import (
 	"time"
 
 	teleport "github.com/gravitational/teleport/api/client"
+	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
 	"google.golang.org/grpc"
 )
@@ -76,4 +77,15 @@ func (t *TeleportClient) UpdateUserRole(ctx context.Context, user types.User) (t
 	}
 
 	return updatedUser, nil
+}
+
+func (t *TeleportClient) GetNodes(ctx context.Context) (*proto.ListResourcesResponse, error) {
+	servers, err := t.client.GetResources(ctx, &proto.ListResourcesRequest{
+		ResourceType: types.KindNode,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return servers, nil
 }
