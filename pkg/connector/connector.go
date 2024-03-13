@@ -49,6 +49,7 @@ func New(ctx context.Context, proxyAddr string) (*Connector, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &Connector{
 		client: tc,
 	}, nil

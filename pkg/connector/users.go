@@ -77,14 +77,12 @@ func addUsers(users []types.User) {
 // Users include a UserTrait because they are the 'shape' of a standard user.
 func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
-	if len(mapUsers) == 0 {
-		users, err := u.client.GetUsers(ctx)
-		if err != nil {
-			return nil, "", nil, err
-		}
-
-		addUsers(users)
+	users, err := u.client.GetUsers(ctx)
+	if err != nil {
+		return nil, "", nil, err
 	}
+
+	addUsers(users)
 
 	for _, userEntry := range mapUsers {
 		userEntryCopy := userEntry

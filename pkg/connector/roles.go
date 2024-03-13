@@ -70,8 +70,8 @@ func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 
 	for _, role := range roles {
 		mapRoles[role.GetName()] = Role{
-			Name: role.GetName(),
 			Id:   role.GetName(),
+			Name: role.GetName(),
 		}
 	}
 

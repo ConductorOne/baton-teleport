@@ -89,3 +89,12 @@ func (t *TeleportClient) GetNodes(ctx context.Context) (*proto.ListResourcesResp
 
 	return servers, nil
 }
+
+func (t *TeleportClient) GetApps(ctx context.Context) ([]types.Application, error) {
+	servers, err := t.client.GetApps(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return servers, nil
+}
