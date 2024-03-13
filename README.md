@@ -1,12 +1,11 @@
 # `baton-teleport` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-teleport.svg)](https://pkg.go.dev/github.com/conductorone/baton-teleport) ![main ci](https://github.com/conductorone/baton-teleport/actions/workflows/main.yaml/badge.svg)
-`baton-teleport` is a connector for teleport built using the [Baton SDK](https://github.com/conductorone/baton-sdk). It communicates with the teleport API to sync data about users, groups and enterprise.
+`baton-teleport` is a connector for teleport built using the [Baton SDK](https://github.com/conductorone/baton-sdk). It communicates with the teleport API to sync data about users, groups, nodes, apps, and databases.
 
 Check out [Baton](https://github.com/conductorone/baton) to learn more the project in general.
 
 # Getting Started
-Free, 14-day trial of Teleport Enterprise
-Simplify access to your SSH and Windows servers, Kubernetes clusters, Databases and Applications
-Implement identity-based access controls
+Free, 14-day trial of Teleport Enterprise.
+Teleport provides on-demand, least-privileged access to your infrastructure, on a foundation of cryptographic identity and zero trust, with built-in identity and policy governance.
 
 ## Prerequisites
 
