@@ -35,8 +35,8 @@ func (d *dbBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 // Create a new connector resource for a Teleport node.
 func getDatabaseResource(db *Database) (*v2.Resource, error) {
 	profile := map[string]interface{}{
-		"app_id":   db.Id,
-		"app_name": db.Name,
+		"db_id":   db.Id,
+		"db_name": db.Name,
 	}
 
 	dbTraitOptions := []rs.RoleTraitOption{
