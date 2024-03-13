@@ -15,6 +15,8 @@ Unlike a trial account, a sponsored account does not expire after 14 days.
 2. Application Scopes: 
   - users
   - roles
+  - apps
+  - databases
   - grant resources
   - revoke resources
 
@@ -48,6 +50,8 @@ baton resources
 `baton-teleport` pulls down information about the following teleport resources:
 - Users
 - Roles
+- Apps
+- Databases
 
 # Running a teleport instance
 
@@ -89,16 +93,14 @@ Available Commands:
   help               Help about any command
 
 Flags:
-      --api-token string       The teleport apitoken. ($BATON_API_TOKEN)
       --client-id string       The client ID used to authenticate with ConductorOne ($BATON_CLIENT_ID)
       --client-secret string   The client secret used to authenticate with ConductorOne ($BATON_CLIENT_SECRET)
-      --email string           The teleport email. ($BATON_EMAIL)
   -f, --file string            The path to the c1z file to sync with ($BATON_FILE) (default "sync.c1z")
   -h, --help                   help for baton-teleport
       --log-format string      The output format for logs: json, console ($BATON_LOG_FORMAT) (default "json")
       --log-level string       The log level: debug, info, warn, error ($BATON_LOG_LEVEL) (default "info")
   -p, --provisioning           This must be set in order for provisioning actions to be enabled. ($BATON_PROVISIONING)
-      --subdomain string       The teleport subdomain. ($BATON_SUBDOMAIN)
+      --proxyAddr string       The fully-qualified teleport proxy service to connect with. Example: "baton.teleport.sh:443" ($BATON_PROXYADDR)
   -v, --version                version for baton-teleport
 
 Use "baton-teleport [command] --help" for more information about a command.
