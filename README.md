@@ -4,11 +4,10 @@
 Check out [Baton](https://github.com/conductorone/baton) to learn more the project in general.
 
 # Getting Started
-You can try out the teleport platform with a free, 14-day trial account. If you're interested in becoming a teleport developer partner, you can convert your trial account into a sponsored teleport Support account.
+Free, 14-day trial of Teleport Enterprise
+Simplify access to your SSH and Windows servers, Kubernetes clusters, Databases and Applications
+Implement identity-based access controls
 
-As part of becoming a teleport developer partner, teleport sponsors an instance for up to 5 agents that you can use for developing, and troubleshooting your app or integration.
-
-Unlike a trial account, a sponsored account does not expire after 14 days.
 ## Prerequisites
 
 1. Teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
