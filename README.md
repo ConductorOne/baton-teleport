@@ -57,7 +57,7 @@ baton resources
 
 # Running a teleport instance
 
-#### Replace `<email_account>` and `<cluster_name>` with your cluster credentials
+#### Replace `<email_account>` and `<cluster_name>` with your cluster credentials, Also add the port number(443) to you cluster_name.
 ```
 1. Add teleport yaml file
 sudo teleport configure -o file \
