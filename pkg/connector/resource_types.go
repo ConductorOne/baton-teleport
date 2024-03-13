@@ -26,4 +26,8 @@ var (
 		Id:          "app",
 		DisplayName: "App",
 	}
+	dbResourceType = &v2.ResourceType{
+		Id:          "database",
+		DisplayName: "Database",
+	}
 )

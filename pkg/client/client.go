@@ -80,21 +80,30 @@ func (t *TeleportClient) UpdateUserRole(ctx context.Context, user types.User) (t
 }
 
 func (t *TeleportClient) GetNodes(ctx context.Context) (*proto.ListResourcesResponse, error) {
-	servers, err := t.client.GetResources(ctx, &proto.ListResourcesRequest{
+	nodes, err := t.client.GetResources(ctx, &proto.ListResourcesRequest{
 		ResourceType: types.KindNode,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return servers, nil
+	return nodes, nil
 }
 
 func (t *TeleportClient) GetApps(ctx context.Context) ([]types.Application, error) {
-	servers, err := t.client.GetApps(ctx)
+	apps, err := t.client.GetApps(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return servers, nil
+	return apps, nil
+}
+
+func (t *TeleportClient) GetDatabases(ctx context.Context) ([]types.Database, error) {
+	databases, err := t.client.GetDatabases(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return databases, nil
 }
