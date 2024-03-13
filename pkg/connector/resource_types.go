@@ -22,4 +22,8 @@ var (
 		Id:          "node",
 		DisplayName: "Node",
 	}
+	appResourceType = &v2.ResourceType{
+		Id:          "app",
+		DisplayName: "App",
+	}
 )
