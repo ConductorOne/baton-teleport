@@ -15,6 +15,7 @@ Unlike a trial account, a sponsored account does not expire after 14 days.
 2. Application Scopes: 
   - users
   - roles
+  - nodes
   - apps
   - databases
   - grant resources
@@ -50,12 +51,13 @@ baton resources
 `baton-teleport` pulls down information about the following teleport resources:
 - Users
 - Roles
+- Nodes
 - Apps
 - Databases
 
 # Running a teleport instance
 
-### Replace `<email_account>` and `<cluster_name>` with your cluster credentials
+#### Replace `<email_account>` and `<cluster_name>` with your cluster credentials
 ```
 1. Add teleport yaml file
 sudo teleport configure -o file \
