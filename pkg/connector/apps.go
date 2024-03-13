@@ -28,8 +28,8 @@ type App struct {
 
 var mapApps = make(map[int64]App)
 
-func (n *appBuilder) ResourceType(_ context.Context) *v2.ResourceType {
-	return n.resourceType
+func (a *appBuilder) ResourceType(_ context.Context) *v2.ResourceType {
+	return a.resourceType
 }
 
 // Create a new connector resource for a Teleport node.
@@ -58,9 +58,9 @@ func getAppResource(app *App) (*v2.Resource, error) {
 
 // List returns all the apps from the database as resource objects.
 // Apps include a NodeTrait because they are the 'shape' of a standard node.
-func (n *appBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (a *appBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
-	apps, err := n.client.GetApps(ctx)
+	apps, err := a.client.GetApps(ctx)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -85,7 +85,7 @@ func (n *appBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *p
 	return rv, "", nil, nil
 }
 
-func (r *appBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (a *appBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	var rv []*v2.Entitlement
 	assignmentOptions := []ent.EntitlementOption{
 		ent.WithGrantableTo(userResourceType),
@@ -102,15 +102,15 @@ func (r *appBuilder) Entitlements(ctx context.Context, resource *v2.Resource, to
 	return rv, "", nil, nil
 }
 
-func (r *appBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+func (a *appBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	return nil, "", nil, nil
 }
 
-func (r *appBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
+func (a *appBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	return nil, nil
 }
 
-func (r *appBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
+func (a *appBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
 	return nil, nil
 }
 
