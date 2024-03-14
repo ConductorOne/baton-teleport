@@ -100,7 +100,7 @@ replace `token` and `ca-pin` with those values you got from the previous step.
 ```
 sudo teleport start --config="/etc/teleport.yaml"
 ```
-8. Generating auth.pem file using tctl
+8. Generating `auth.pem` file using tctl
 ```
 TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email_account> --out=auth.pem
 ```
