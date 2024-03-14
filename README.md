@@ -8,9 +8,11 @@ Free, 14-day trial of Teleport Enterprise.
 Teleport provides on-demand, least-privileged access to your infrastructure, on a foundation of cryptographic identity and zero trust, with built-in identity and policy governance.
 
 ## Prerequisites
-
-1. Teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
-2. Application Scopes: 
+- A running Teleport cluster. For details on how to set this up, see the [Getting Started guide](https://goteleport.com/docs/).
+- The tctl admin tool and tsh client tool version >= 15.1.4.
+  See [Installation](https://goteleport.com/docs/installation/) for details.
+- Teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
+- Application Scopes: 
   - users
   - roles
   - nodes
@@ -57,18 +59,28 @@ baton resources
 
 #### Replace `<email_account>` and `<cluster_name>` with your cluster credentials, Also add the port number(:443) to your cluster_name.
 ```
-1. Add teleport yaml file
+- Install Teleport
+curl https://goteleport.com/static/install.sh | bash -s 15.1.4
+
+- Add teleport yaml file
 sudo teleport configure -o file \
 --acme --acme-email=<email_account> \
 --cluster-name=<cluster_name>
 
-2. Start teleport using our previous yaml file
+- Logging your teleport cluster
+tsh login --proxy=<cluster_name> --user=<email_account>
+tctl status
+
+- Generate an invitation token with roles for the host. 
+The invitation token is required for the local computer to join the Teleport cluster.
+TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
+
+- Open the Teleport configuration file, `/etc/teleport.yaml`, in an editor on the computer where you installed the Teleport agent and replace `token` and `ca-pin` with those values you got from the previous step
+
+- Start teleport using our teleport yaml file
 sudo teleport start --config="/etc/teleport.yaml"
 
-3. Logging your teleport cluster
-tsh login --proxy=<cluster_name> --user=<email_account>
-
-4. Generating auth.pem file using tctl
+- Generating auth.pem file using tctl
 TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email_account> --out=auth.pem
 ```
 
