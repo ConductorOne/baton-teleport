@@ -1,0 +1,50 @@
+kind: role
+metadata:
+  description: Automatically generated role for bot github-actions-cd
+  id: 1710095917043273201
+  labels:
+    teleport.internal/bot: github-actions-cd
+  name: bot-github-actions-cd
+  revision: c0e31fde-f48f-4a0e-85ba-bba73915f06c
+spec:
+  allow:
+    impersonate:
+      roles:
+      - github-actions-cd
+      - access
+      - auditor
+      - bot-github-actions-cd
+      - device-admin
+      - device-enroll
+      - editor
+      - group-access
+      - requester
+      - require-trusted-device
+      - reviewer
+    rules:
+    - resources:
+      - cert_authority
+      verbs:
+      - readnosecrets
+  deny: {}
+  options:
+    cert_format: standard
+    create_db_user: false
+    create_desktop_user: false
+    desktop_clipboard: true
+    desktop_directory_sharing: true
+    enhanced_recording:
+    - command
+    - network
+    forward_agent: false
+    idp:
+      saml:
+        enabled: true
+    max_session_ttl: 12h0m0s
+    pin_source_ip: false
+    port_forwarding: true
+    record_session:
+      default: best_effort
+      desktop: true
+    ssh_file_copy: true
+version: v7
