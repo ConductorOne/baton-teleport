@@ -69,7 +69,7 @@ sudo teleport configure -o file \
 
 - Logging your teleport cluster
 tsh login --proxy=<cluster_name> --user=<email_account>
-tctl status
+TELEPORT_CONFIG_FILE="" tctl status
 
 - Start teleport using our teleport yaml file
 sudo teleport start --config="/etc/teleport.yaml"
