@@ -83,7 +83,8 @@ The invitation token is required for the local computer to join the cluster.
 ```
 TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
 ```
-A similar output will be shown
+A similar output will be shown:
+
   teleport start \
    --roles=node \
    `--token=dd5f637d11e94c3fb2ed3516b9482e74` \
