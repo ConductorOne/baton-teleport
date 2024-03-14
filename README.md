@@ -86,8 +86,12 @@ TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
 A similar output will be shown
   teleport start \
    --roles=node \
+   ```
    --token=dd5f637d11e94c3fb2ed3516b9482e74 \
+   ```
+   ```
    --ca-pin=sha256:5fc6849caaf45eb70fb564224b727dbce31a32f2a8329910fcebc84aaaee7160 \
+   ```
    --auth-server=baton-conductorone.teleport.sh:443
 
 6. Open the Teleport configuration file, `/etc/teleport.yaml`, 
