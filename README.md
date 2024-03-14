@@ -78,7 +78,9 @@ sudo teleport start --config="/etc/teleport.yaml"
 The invitation token is required for the local computer to join the Teleport cluster.
 TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
 
-6. Open the Teleport configuration file, `/etc/teleport.yaml`, in an editor on the computer where you installed the Teleport agent and replace `token` and `ca-pin` with those values you got from the previous step.
+6. Open the Teleport configuration file, `/etc/teleport.yaml`, 
+in an editor on the computer where you installed the Teleport agent and 
+replace `token` and `ca-pin` with those values you got from the previous step.
 
 7. Stop and Re-start teleport using our teleport yaml file
 sudo teleport start --config="/etc/teleport.yaml"
