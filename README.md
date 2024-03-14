@@ -122,6 +122,10 @@ export INVITE_TOKEN=<token>
 ```
 sudo teleport start --token=${INVITE_TOKEN?}
 ```
+5. Generating `auth.pem` file using tctl admin tool 
+```
+TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email_account> --out=auth.pem
+```
 # Contributing, Support, and Issues
 
 We started Baton because we were tired of taking screenshots and manually building spreadsheets. We welcome contributions, and ideas, no matter how small -- our goal is to make identity and permissions sprawl less painful for everyone. If you have questions, concerns, or ideas: Please open a Github Issue!
