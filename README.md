@@ -75,14 +75,22 @@ TELEPORT_CONFIG_FILE="" tctl status
 sudo teleport start --config="/etc/teleport.yaml"
 
 5. Generate an invitation token with roles for the host. 
-The invitation token is required for the local computer to join the Teleport cluster.
+The invitation token is required for the local computer to join the cluster.
+
 TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
+
+A similar output will be shown
+  teleport start \
+   --roles=node \
+   --token=dd5f637d11e94c3fb2ed3516b9482e74 \
+   --ca-pin=sha256:5fc6849caaf45eb70fb564224b727dbce31a32f2a8329910fcebc84aaaee7160 \
+   --auth-server=baton-conductorone.teleport.sh:443
 
 6. Open the Teleport configuration file, `/etc/teleport.yaml`, 
 in an editor on the computer where you installed the Teleport agent and 
 replace `token` and `ca-pin` with those values you got from the previous step.
 
-7. Stop and Re-start teleport using our teleport yaml file
+7. Stop and Re-start teleport
 sudo teleport start --config="/etc/teleport.yaml"
 
 8. Generating auth.pem file using tctl
