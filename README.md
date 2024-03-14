@@ -105,6 +105,20 @@ sudo teleport start --config="/etc/teleport.yaml"
 TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email_account> --out=auth.pem
 ```
 
+## Alternatively, You can start teleport by generating an invitation token 
+
+1. Generate an invitation token with roles for the host. 
+TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
+
+2. List all valid tokens
+TELEPORT_CONFIG_FILE="" tctl tokens ls
+
+3. Copy the token and assign it to an environment variable on the computer you are enrolling as a resource:
+export INVITE_TOKEN=<token>
+
+4. Start Teleport with the invitation token you saved in the INVITE_TOKEN environment variable:
+sudo teleport start --token=${INVITE_TOKEN?}
+
 # Contributing, Support, and Issues
 
 We started Baton because we were tired of taking screenshots and manually building spreadsheets. We welcome contributions, and ideas, no matter how small -- our goal is to make identity and permissions sprawl less painful for everyone. If you have questions, concerns, or ideas: Please open a Github Issue!
