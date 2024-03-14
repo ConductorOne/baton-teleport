@@ -11,6 +11,7 @@ Teleport provides on-demand, least-privileged access to your infrastructure, on 
 - A running Teleport cluster. For details on how to set this up, see the [Getting Started guide](https://goteleport.com/docs/).
 - The tctl admin tool and tsh client tool version >= 15.1.4.
   See [Installation](https://goteleport.com/docs/installation/) for details.
+- An identity file named `auth.pem` It can be added, using tctl admin tool.
 - Teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
 - Application Scopes: 
   - users
