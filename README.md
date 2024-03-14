@@ -58,27 +58,31 @@ baton resources
 # Running a teleport instance
 
 #### Replace `<email_account>` and `<cluster_name>` with your cluster credentials, Also add the port number(:443) to your cluster_name.
-```
-1. Install Teleport
-curl https://goteleport.com/static/install.sh | bash -s 15.1.4
 
+1. Install Teleport
+```
+curl https://goteleport.com/static/install.sh | bash -s 15.1.4
+```
 2. Adding teleport yaml file
+```
 sudo teleport configure -o file \
 --acme --acme-email=<email_account> \
 --cluster-name=<cluster_name>
-
+```
 3. Logging your teleport cluster
+```
 tsh login --proxy=<cluster_name> --user=<email_account>
 TELEPORT_CONFIG_FILE="" tctl status
-
+```
 4. Start teleport using our teleport yaml file
+```
 sudo teleport start --config="/etc/teleport.yaml"
-
+```
 5. Generate an invitation token with roles for the host. 
 The invitation token is required for the local computer to join the cluster.
-
+```
 TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
-
+```
 A similar output will be shown
   teleport start \
    --roles=node \
@@ -91,9 +95,11 @@ in an editor on the computer where you installed the Teleport agent and
 replace `token` and `ca-pin` with those values you got from the previous step.
 
 7. Stop and Re-start teleport
+```
 sudo teleport start --config="/etc/teleport.yaml"
-
+```
 8. Generating auth.pem file using tctl
+```
 TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email_account> --out=auth.pem
 ```
 
