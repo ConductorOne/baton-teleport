@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -24,13 +25,6 @@ type roleBuilder struct {
 	client       *client.TeleportClient
 }
 
-type Role struct {
-	Name string
-	Id   string
-}
-
-var mapRoles = make(map[string]Role)
-
 func (r *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return r.resourceType
 }
@@ -38,8 +32,8 @@ func (r *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 // Create a new connector resource for a Teleport role.
 func getRoleResource(role types.Role) (*v2.Resource, error) {
 	profile := map[string]interface{}{
-		"role_name": role.GetName(),
 		"role_id":   role.GetMetadata().ID,
+		"role_name": role.GetName(),
 	}
 
 	roleTraitOptions := []rs.RoleTraitOption{
@@ -66,13 +60,6 @@ func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 	roles, err := r.client.GetRoles(ctx)
 	if err != nil {
 		return nil, "", nil, err
-	}
-
-	for _, role := range roles {
-		mapRoles[role.GetName()] = Role{
-			Id:   role.GetName(),
-			Name: role.GetName(),
-		}
 	}
 
 	for _, role := range roles {
@@ -138,8 +125,17 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 	userName := principal.Id.Resource
-	roleName := entitlement.Resource.Id.Resource
+	roleId, err := strconv.ParseInt(entitlement.Resource.Id.Resource, 10, 64)
+	if err != nil {
+		return nil, err
+	}
 
+	roles, err := r.client.GetRoles(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	roleName := getRoleName(roleId, roles)
 	if principal.Id.ResourceType != userResourceType.Id {
 		l.Warn(
 			"baton-teleport: only users can be granted role membership",
@@ -199,13 +195,23 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 		return nil, fmt.Errorf("teleport-connector: only users can have role membership revoked")
 	}
 
-	roleName := entitlement.Resource.Id.Resource
+	roleId, err := strconv.ParseInt(entitlement.Resource.Id.Resource, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
 	userName := principal.Id.Resource
 	user, err := r.client.GetUser(ctx, userName)
 	if err != nil {
 		return nil, err
 	}
 
+	roles, err := r.client.GetRoles(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	roleName := getRoleName(roleId, roles)
 	user.SetLogins(append(user.GetLogins(), userName))
 	for _, role := range user.GetRoles() {
 		if role != roleName {

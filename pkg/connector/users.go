@@ -22,6 +22,10 @@ func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 }
 
 func userResource(ctx context.Context, pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
+	var (
+		accountType = v2.UserTrait_ACCOUNT_TYPE_HUMAN
+		status      v2.UserTrait_Status_Status
+	)
 	firstName, lastName := helpers.SplitFullName(user.GetName())
 	profile := map[string]interface{}{
 		"name":       user.GetName(),
@@ -29,6 +33,19 @@ func userResource(ctx context.Context, pId *v2.ResourceId, user types.User) (*v2
 		"user_id":    user.GetMetadata().ID,
 		"first_name": firstName,
 		"last_name":  lastName,
+	}
+
+	if user.IsBot() {
+		accountType = v2.UserTrait_ACCOUNT_TYPE_SYSTEM
+	}
+
+	switch user.GetStatus().IsLocked {
+	case true:
+		status = v2.UserTrait_Status_STATUS_DISABLED
+	case false:
+		status = v2.UserTrait_Status_STATUS_ENABLED
+	default:
+		status = v2.UserTrait_Status_STATUS_UNSPECIFIED
 	}
 
 	resource, err := resource.NewUserResource(
@@ -39,7 +56,8 @@ func userResource(ctx context.Context, pId *v2.ResourceId, user types.User) (*v2
 			resource.WithUserProfile(profile),
 			resource.WithEmail(user.GetName(), true),
 			resource.WithUserLogin(user.GetName()),
-			resource.WithStatus(v2.UserTrait_Status_STATUS_ENABLED),
+			resource.WithStatus(status),
+			resource.WithAccountType(accountType),
 		},
 		resource.WithParentResourceID(pId),
 	)
