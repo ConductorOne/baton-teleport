@@ -36,10 +36,10 @@ func (r *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 }
 
 // Create a new connector resource for a Teleport role.
-func getRoleResource(role *Role) (*v2.Resource, error) {
+func getRoleResource(role types.Role) (*v2.Resource, error) {
 	profile := map[string]interface{}{
-		"role_name": role.Name,
-		"role_id":   role.Id,
+		"role_name": role.GetName(),
+		"role_id":   role.GetMetadata().ID,
 	}
 
 	roleTraitOptions := []rs.RoleTraitOption{
@@ -47,9 +47,9 @@ func getRoleResource(role *Role) (*v2.Resource, error) {
 	}
 
 	ret, err := rs.NewRoleResource(
-		role.Name,
+		role.GetName(),
 		roleResourceType,
-		role.Id,
+		role.GetMetadata().ID,
 		roleTraitOptions,
 	)
 	if err != nil {
@@ -75,9 +75,9 @@ func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 		}
 	}
 
-	for _, role := range mapRoles {
+	for _, role := range roles {
 		roleCopy := role
-		rr, err := getRoleResource(&roleCopy)
+		rr, err := getRoleResource(roleCopy)
 		if err != nil {
 			return nil, "", nil, err
 		}
@@ -106,26 +106,27 @@ func (r *roleBuilder) Entitlements(ctx context.Context, resource *v2.Resource, t
 
 func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	var rv []*v2.Grant
-	if len(mapUsers) == 0 {
-		users, err := r.client.GetUsers(ctx)
-		if err != nil {
-			return nil, "", nil, err
-		}
-
-		addUsers(users)
+	users, err := r.client.GetUsers(ctx)
+	if err != nil {
+		return nil, "", nil, err
 	}
 
-	for _, userEntry := range mapUsers {
-		userEntryCopy := userEntry
-		ur, err := userResource(ctx, resource.Id, &userEntryCopy)
+	for _, user := range users {
+		userCopy := user
+		if user.GetStatus().IsLocked || user.IsBot() {
+			continue
+		}
+
+		ur, err := userResource(ctx, resource.Id, userCopy)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("error creating user resource for role %s: %w", resource.Id.Resource, err)
 		}
 
-		for _, role := range userEntry.Roles {
-			if role != resource.Id.Resource {
+		for _, role := range user.GetRoles() {
+			if role != resource.DisplayName {
 				continue
 			}
+
 			gr := grant.NewGrant(resource, roleMembership, ur.Id)
 			rv = append(rv, gr)
 		}

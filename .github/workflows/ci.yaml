@@ -48,8 +48,8 @@ jobs:
     env:
       BATON_LOG_LEVEL: debug
       # The following parameters are passed to grant/revoke commands
-      CONNECTOR_GRANT: 'role:requester:member:user:homime2188@sfpixel.com'
-      CONNECTOR_ENTITLEMENT: 'role:requester:member'
+      CONNECTOR_GRANT: 'role:1709575171116237527:member:user:homime2188@sfpixel.com'
+      CONNECTOR_ENTITLEMENT: 'role:1709575171116237527:member'
       CONNECTOR_PRINCIPAL: 'homime2188@sfpixel.com'
       CONNECTOR_PRINCIPAL_TYPE: 'user'
       TELEPORT_PROXY: 'd3v-conductorone.teleport.sh:443'

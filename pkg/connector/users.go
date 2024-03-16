@@ -17,38 +17,28 @@ type userBuilder struct {
 	client       *client.TeleportClient
 }
 
-var mapUsers = make(map[string]User)
-
-type User struct {
-	Name   string
-	Email  string
-	Kind   string
-	Roles  []string
-	Traits map[string][]string
-}
-
 func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return userResourceType
 }
 
-func userResource(ctx context.Context, pId *v2.ResourceId, user *User) (*v2.Resource, error) {
-	firstName, lastName := helpers.SplitFullName(user.Name)
+func userResource(ctx context.Context, pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
+	firstName, lastName := helpers.SplitFullName(user.GetName())
 	profile := map[string]interface{}{
-		"name":       user.Name,
-		"email":      user.Email,
-		"user_id":    user.Email,
+		"name":       user.GetName(),
+		"email":      user.GetName(),
+		"user_id":    user.GetMetadata().ID,
 		"first_name": firstName,
 		"last_name":  lastName,
 	}
 
 	resource, err := resource.NewUserResource(
-		user.Email,
+		user.GetName(),
 		userResourceType,
-		user.Email,
+		user.GetName(),
 		[]resource.UserTraitOption{
 			resource.WithUserProfile(profile),
-			resource.WithEmail(user.Email, true),
-			resource.WithUserLogin(user.Email),
+			resource.WithEmail(user.GetName(), true),
+			resource.WithUserLogin(user.GetName()),
 			resource.WithStatus(v2.UserTrait_Status_STATUS_ENABLED),
 		},
 		resource.WithParentResourceID(pId),
@@ -61,18 +51,6 @@ func userResource(ctx context.Context, pId *v2.ResourceId, user *User) (*v2.Reso
 	return resource, nil
 }
 
-func addUsers(users []types.User) {
-	for _, user := range users {
-		mapUsers[user.GetName()] = User{
-			Name:   user.GetName(),
-			Email:  user.GetName(),
-			Kind:   user.GetKind(),
-			Roles:  user.GetRoles(),
-			Traits: user.GetTraits(),
-		}
-	}
-}
-
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
 func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
@@ -82,12 +60,12 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	addUsers(users)
-
-	for _, userEntry := range mapUsers {
-		userEntryCopy := userEntry
-
-		ur, err := userResource(ctx, parentResourceID, &userEntryCopy)
+	for _, user := range users {
+		userCopy := user
+		if user.GetStatus().IsLocked || user.IsBot() {
+			continue
+		}
+		ur, err := userResource(ctx, parentResourceID, userCopy)
 		if err != nil {
 			return nil, "", nil, err
 		}
