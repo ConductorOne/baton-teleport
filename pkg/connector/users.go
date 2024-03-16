@@ -36,7 +36,7 @@ func userResource(ctx context.Context, pId *v2.ResourceId, user types.User) (*v2
 	}
 
 	if user.IsBot() {
-		accountType = v2.UserTrait_ACCOUNT_TYPE_SYSTEM
+		accountType = v2.UserTrait_ACCOUNT_TYPE_SERVICE
 	}
 
 	switch user.GetStatus().IsLocked {

@@ -7,6 +7,7 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
+	"github.com/gravitational/teleport/api/types"
 
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
@@ -20,23 +21,15 @@ type appBuilder struct {
 	client       *client.TeleportClient
 }
 
-type App struct {
-	Id        int64
-	Name      string
-	Namespace string
-}
-
-var mapApps = make(map[int64]App)
-
 func (a *appBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return a.resourceType
 }
 
 // Create a new connector resource for a Teleport node.
-func getAppResource(app *App) (*v2.Resource, error) {
+func getAppResource(app types.Application) (*v2.Resource, error) {
 	profile := map[string]interface{}{
-		"app_id":   app.Id,
-		"app_name": app.Name,
+		"app_id":   app.GetMetadata().ID,
+		"app_name": app.GetName(),
 	}
 
 	appTraitOptions := []rs.RoleTraitOption{
@@ -44,9 +37,9 @@ func getAppResource(app *App) (*v2.Resource, error) {
 	}
 
 	ret, err := rs.NewRoleResource(
-		app.Name,
+		app.GetName(),
 		appResourceType,
-		app.Id,
+		app.GetMetadata().ID,
 		appTraitOptions,
 	)
 	if err != nil {
@@ -66,16 +59,8 @@ func (a *appBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *p
 	}
 
 	for _, app := range apps {
-		mapApps[app.GetResourceID()] = App{
-			Id:        app.GetResourceID(),
-			Name:      app.GetName(),
-			Namespace: app.GetNamespace(),
-		}
-	}
-
-	for _, app := range mapApps {
 		appCopy := app
-		rr, err := getAppResource(&appCopy)
+		rr, err := getAppResource(appCopy)
 		if err != nil {
 			return nil, "", nil, err
 		}
