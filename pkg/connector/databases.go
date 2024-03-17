@@ -7,6 +7,7 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
+	"github.com/gravitational/teleport/api/types"
 
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
@@ -20,23 +21,15 @@ type dbBuilder struct {
 	client       *client.TeleportClient
 }
 
-type Database struct {
-	Id        int64
-	Name      string
-	Namespace string
-}
-
-var mapDatabases = make(map[int64]Database)
-
 func (d *dbBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return d.resourceType
 }
 
 // Create a new connector resource for a Teleport node.
-func getDatabaseResource(db *Database) (*v2.Resource, error) {
+func getDatabaseResource(db types.Database) (*v2.Resource, error) {
 	profile := map[string]interface{}{
-		"db_id":   db.Id,
-		"db_name": db.Name,
+		"db_id":   db.GetResourceID(),
+		"db_name": db.GetName(),
 	}
 
 	dbTraitOptions := []rs.RoleTraitOption{
@@ -44,9 +37,9 @@ func getDatabaseResource(db *Database) (*v2.Resource, error) {
 	}
 
 	ret, err := rs.NewRoleResource(
-		db.Name,
+		db.GetName(),
 		dbResourceType,
-		db.Id,
+		db.GetResourceID(),
 		dbTraitOptions,
 	)
 	if err != nil {
@@ -66,16 +59,8 @@ func (d *dbBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pa
 	}
 
 	for _, db := range databases {
-		mapDatabases[db.GetResourceID()] = Database{
-			Id:        db.GetResourceID(),
-			Name:      db.GetName(),
-			Namespace: db.GetNamespace(),
-		}
-	}
-
-	for _, db := range mapDatabases {
 		dbCopy := db
-		rr, err := getDatabaseResource(&dbCopy)
+		rr, err := getDatabaseResource(dbCopy)
 		if err != nil {
 			return nil, "", nil, err
 		}
