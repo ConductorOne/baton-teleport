@@ -104,8 +104,8 @@ github.com/cncf/udpa/go v0.0.0-20210930031921-04548b0d99d4/go.mod h1:6pvJx4me5XP
 github.com/cncf/xds/go v0.0.0-20210805033703-aa0b78936158/go.mod h1:eXthEFrGJvWHgFFCl3hGmgk+/aYT6PnTQLykKQRLhEs=
 github.com/cncf/xds/go v0.0.0-20210922020428-25de7278fc84/go.mod h1:eXthEFrGJvWHgFFCl3hGmgk+/aYT6PnTQLykKQRLhEs=
 github.com/cncf/xds/go v0.0.0-20211011173535-cb28da3451f1/go.mod h1:eXthEFrGJvWHgFFCl3hGmgk+/aYT6PnTQLykKQRLhEs=
-github.com/conductorone/baton-sdk v0.1.27 h1:fHFb2Hvjn1S80d2MG3Ntw1Aqj3eSfPy9APHgLZrQN4k=
-github.com/conductorone/baton-sdk v0.1.27/go.mod h1:1VMycIep+HU8JXef2wenT3ECzx1w3Jr3KDQG+L6Mv30=
+github.com/conductorone/baton-sdk v0.1.28 h1:OrooIXcQ85d5H3oaN3yuloOyx8fEDElZkC81JsLC188=
+github.com/conductorone/baton-sdk v0.1.28/go.mod h1:1VMycIep+HU8JXef2wenT3ECzx1w3Jr3KDQG+L6Mv30=
 github.com/coreos/go-semver v0.3.1 h1:yi21YpKnrx1gt5R+la8n5WgS0kCrsPp33dmEyHReZr4=
 github.com/coreos/go-semver v0.3.1/go.mod h1:irMmmIw/7yzSRPWryHsK7EYSg09caPQL03VsM8rvUec=
 github.com/cpuguy83/go-md2man/v2 v2.0.3/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
