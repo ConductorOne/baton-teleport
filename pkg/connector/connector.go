@@ -7,14 +7,21 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-teleport/pkg/client"
 )
 
-type Connector struct{}
+type Connector struct {
+	client *client.TeleportClient
+}
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
 	return []connectorbuilder.ResourceSyncer{
-		newUserBuilder(),
+		newUserBuilder(d.client),
+		newRoleBuilder(d.client),
+		newNodeBuilder(d.client),
+		newAppBuilder(d.client),
+		newDatabaseBuilder(d.client),
 	}
 }
 
@@ -27,8 +34,8 @@ func (d *Connector) Asset(ctx context.Context, asset *v2.AssetRef) (string, io.R
 // Metadata returns metadata about the connector.
 func (d *Connector) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 	return &v2.ConnectorMetadata{
-		DisplayName: "My Baton Connector",
-		Description: "The template implementation of a baton connector",
+		DisplayName: "Baton Teleport Connector",
+		Description: "Connector syncing users, and roles from Teleport.",
 	}, nil
 }
 
@@ -39,6 +46,13 @@ func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, erro
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context) (*Connector, error) {
-	return &Connector{}, nil
+func New(ctx context.Context, proxyAddr string) (*Connector, error) {
+	tc, err := client.New(ctx, proxyAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Connector{
+		client: tc,
+	}, nil
 }
