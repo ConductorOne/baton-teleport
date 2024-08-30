@@ -22,8 +22,10 @@ const (
 )
 
 var (
-	apiKeyField         = field.StringField(proxyAddr, field.WithDescription("The fully-qualified teleport proxy service to connect with. Example: \"baton.teleport.sh:443\"."))
-	configurationFields = []field.SchemaField{apiKeyField}
+	proxyAddrField = field.StringField(proxyAddr,
+		field.WithRequired(true),
+		field.WithDescription("The fully-qualified teleport proxy service to connect with. Example: \"baton.teleport.sh:443\"."))
+	configurationFields = []field.SchemaField{proxyAddrField}
 )
 
 func main() {
