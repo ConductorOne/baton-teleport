@@ -125,6 +125,7 @@ func TestRoleGrant(t *testing.T) {
 	require.Nil(t, err)
 
 	entitlement := getEntitlementForTesting(resource, roleName, roleEntitlement)
+	require.NotNil(t, entitlement)
 
 	cliTest, err := getTestingClient(ctxTest, proxyAddrTest, filePathTest)
 	require.Nil(t, err)
