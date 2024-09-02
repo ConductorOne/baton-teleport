@@ -102,9 +102,12 @@ func TestRoleRevoke(t *testing.T) {
 	require.Nil(t, err)
 
 	roleBuilder := getRoleBuilderForTesting(cliTest)
+	require.NotNil(t, roleBuilder)
+
 	gr := grant.NewGrant(resource, roleEntitlement, ur.Id)
 	annos := annotations.Annotations(gr.Annotations)
 	gr.Annotations = annos
+	require.NotNil(t, gr)
 
 	// --revoke-grant "role:reviewer:member:user:miguel_chavez_m@hotmail.com"
 	_, err = roleBuilder.Revoke(ctxTest, gr)
@@ -131,6 +134,8 @@ func TestRoleGrant(t *testing.T) {
 	require.Nil(t, err)
 
 	roleBuilder := getRoleBuilderForTesting(cliTest)
+	require.NotNil(t, roleBuilder)
+
 	// --grant-entitlement "role:reviewer:member" --grant-principal-type user --grant-principal "miguel_chavez_m@hotmail.com"
 	_, err = roleBuilder.Grant(ctxTest, principal, entitlement)
 	require.Nil(t, err)
