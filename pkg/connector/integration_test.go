@@ -21,12 +21,17 @@ import (
 )
 
 var (
-	ctxTest       = context.Background()
-	proxyAddrTest = "conductorone-c1.teleport.sh:443"
-	filePathTest  = "../../auth.pem"
+	ctxTest         = context.Background()
+	proxyAddrTest   = "conductorone-c1.teleport.sh:443"
+	filePathTest    = "../../auth.pem"
+	roleName        = "reviewer"
+	roleDescription = "Review access requests"
+	roleEntitlement = "member"
+	userName        = "miguel_chavez_m@hotmail.com"
+	userDescription = "user for testing"
 )
 
-func Test_roleBuilderList(t *testing.T) {
+func TestRoleList(t *testing.T) {
 	if !checkFileExists(filePathTest) {
 		t.Skip()
 	}
@@ -81,13 +86,6 @@ func checkFileExists(filePath string) bool {
 }
 
 func TestRoleRevoke(t *testing.T) {
-	var (
-		roleName        = "reviewer"
-		roleDescription = "Review access requests"
-		userName        = "miguel_chavez_m@hotmail.com"
-		userDescription = "user for testing"
-		roleEntitlement = "member"
-	)
 	if !checkFileExists(filePathTest) {
 		t.Skip()
 	}
@@ -113,14 +111,7 @@ func TestRoleRevoke(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestResourceTypeGrant(t *testing.T) {
-	var (
-		userName        = "miguel_chavez_m@hotmail.com"
-		userDescription = "User for testing"
-		roleName        = "reviewer"
-		roleDescription = "Review access requests"
-		roleEntitlement = "member"
-	)
+func TestRoleGrant(t *testing.T) {
 	if !checkFileExists(filePathTest) {
 		t.Skip()
 	}
