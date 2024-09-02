@@ -77,7 +77,8 @@ func NewTestingClient(ctx context.Context, proxyAddr, file string) (*client.Tele
 		return nil, err
 	}
 
-	return tc.SetClient(ctx, client), nil
+	tc.SetClient(ctx, client)
+	return tc, nil
 }
 
 func checkFileExists(filePath string) bool {
