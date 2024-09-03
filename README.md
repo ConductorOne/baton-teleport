@@ -153,8 +153,10 @@ Flags:
   -h, --help                   help for baton-teleport
       --log-format string      The output format for logs: json, console ($BATON_LOG_FORMAT) (default "json")
       --log-level string       The log level: debug, info, warn, error ($BATON_LOG_LEVEL) (default "info")
-  -p, --provisioning           This must be set in order for provisioning actions to be enabled. ($BATON_PROVISIONING)
-      --proxyAddr string       The fully-qualified teleport proxy service to connect with. Example: "baton.teleport.sh:443" ($BATON_PROXYADDR)
+  -p, --provisioning           This must be set in order for provisioning actions to be enabled ($BATON_PROVISIONING)
+      --proxyAddr string       required: The fully-qualified teleport proxy service to connect with. Example: "baton.teleport.sh:443". ($BATON_PROXYADDR)
+      --skip-full-sync         This must be set to skip a full sync ($BATON_SKIP_FULL_SYNC)
+      --ticketing              This must be set to enable ticketing support ($BATON_TICKETING)
   -v, --version                version for baton-teleport
 
 Use "baton-teleport [command] --help" for more information about a command.

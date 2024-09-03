@@ -1,62 +1,17 @@
-kind: role
+kind: token
 metadata:
-  id: 1710099219683582351
+  expires: "0001-01-01T00:00:00Z"
   labels:
     teleport.internal/ui-flow: github-actions-ssh
   name: github-actions-cd
-  revision: 8a7c6905-055d-4b62-bbfc-763294ed6c11
+  revision: 22b3e36c-ef5a-4717-bcaa-ac649e1aa070
 spec:
-  allow:
-    impersonate:
-      roles:
-      - '*'
-      users:
-      - '*'
-    kubernetes_groups:
-    - '{{internal.kubernetes_groups}}'
-    kubernetes_resources:
-    - kind: '*'
-      name: '*'
-      namespace: '*'
-      verbs:
-      - '*'
-    kubernetes_users:
-    - '{{internal.kubernetes_users}}'
-    logins:
-    - root
-    node_labels:
-      '*': '*'
-    rules:
-    - resources:
-      - event
-      verbs:
-      - list
-      - read
-    - resources:
-      - session
-      verbs:
-      - read
-      - list
-      where: contains(session.participants, user.metadata.name)
-  deny: {}
-  options:
-    cert_format: standard
-    create_db_user: false
-    create_desktop_user: false
-    desktop_clipboard: true
-    desktop_directory_sharing: true
-    enhanced_recording:
-    - command
-    - network
-    forward_agent: false
-    idp:
-      saml:
-        enabled: true
-    max_session_ttl: 30h0m0s
-    pin_source_ip: false
-    port_forwarding: true
-    record_session:
-      default: best_effort
-      desktop: true
-    ssh_file_copy: true
-version: v7
+  bot_name: github-actions-cd
+  github:
+    allow:
+    - repository: ConductorOne/baton-teleport
+      repository_owner: ConductorOne
+  join_method: github
+  roles:
+  - Bot
+version: v2

@@ -1,11 +1,10 @@
 kind: role
 metadata:
   description: Automatically generated role for bot github-actions-cd
-  id: 1710095917043273201
   labels:
     teleport.internal/bot: github-actions-cd
   name: bot-github-actions-cd
-  revision: c0e31fde-f48f-4a0e-85ba-bba73915f06c
+  revision: 95324686-3506-4e09-8979-95e0e7cce9ed
 spec:
   allow:
     impersonate:

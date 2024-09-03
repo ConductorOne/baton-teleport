@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
-	"github.com/gravitational/teleport/api/types"
 )
 
 // Populate entitlement options for teleport resource.
@@ -15,16 +14,4 @@ func PopulateOptions(displayName, permission, resource string) []ent.Entitlement
 		ent.WithGrantableTo(roleResourceType, userResourceType),
 	}
 	return options
-}
-
-func getRoleName(roleId int64, roles []types.Role) string {
-	var roleName string = ""
-	for _, role := range roles {
-		if role.GetMetadata().ID != roleId {
-			continue
-		}
-		roleName = role.GetMetadata().Name
-	}
-
-	return roleName
 }

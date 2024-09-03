@@ -3,7 +3,6 @@ package connector
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -32,8 +31,9 @@ func (r *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 // Create a new connector resource for a Teleport role.
 func getRoleResource(role types.Role) (*v2.Resource, error) {
 	profile := map[string]interface{}{
-		"role_id":   role.GetMetadata().ID,
-		"role_name": role.GetName(),
+		"role_id":          role.GetMetadata().ID,
+		"role_name":        role.GetMetadata().Name,
+		"role_description": role.GetMetadata().Description,
 	}
 
 	roleTraitOptions := []rs.RoleTraitOption{
@@ -43,7 +43,7 @@ func getRoleResource(role types.Role) (*v2.Resource, error) {
 	ret, err := rs.NewRoleResource(
 		role.GetName(),
 		roleResourceType,
-		role.GetMetadata().ID,
+		role.GetMetadata().Name,
 		roleTraitOptions,
 	)
 	if err != nil {
@@ -125,17 +125,7 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 	userName := principal.Id.Resource
-	roleId, err := strconv.ParseInt(entitlement.Resource.Id.Resource, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	roles, err := r.client.GetRoles(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	roleName := getRoleName(roleId, roles)
+	roleName := entitlement.Resource.Id.Resource
 	if principal.Id.ResourceType != userResourceType.Id {
 		l.Warn(
 			"baton-teleport: only users can be granted role membership",
@@ -195,23 +185,13 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 		return nil, fmt.Errorf("teleport-connector: only users can have role membership revoked")
 	}
 
-	roleId, err := strconv.ParseInt(entitlement.Resource.Id.Resource, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
+	roleName := entitlement.Resource.Id.Resource
 	userName := principal.Id.Resource
 	user, err := r.client.GetUser(ctx, userName)
 	if err != nil {
 		return nil, err
 	}
 
-	roles, err := r.client.GetRoles(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	roleName := getRoleName(roleId, roles)
 	user.SetLogins(append(user.GetLogins(), userName))
 	for _, role := range user.GetRoles() {
 		if role != roleName {

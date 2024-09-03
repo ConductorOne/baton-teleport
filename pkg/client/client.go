@@ -39,6 +39,10 @@ func New(ctx context.Context, proxyAddr string) (*TeleportClient, error) {
 	return tc, nil
 }
 
+func (t *TeleportClient) SetClient(ctx context.Context, c *teleport.Client) {
+	t.client = c
+}
+
 // GetUsers fetch users list.
 func (t *TeleportClient) GetUsers(ctx context.Context) ([]types.User, error) {
 	users, err := t.client.GetUsers(ctx, false)

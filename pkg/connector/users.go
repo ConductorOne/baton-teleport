@@ -5,7 +5,6 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/helpers"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/conductorone/baton-teleport/pkg/client"
@@ -26,7 +25,7 @@ func userResource(ctx context.Context, pId *v2.ResourceId, user types.User) (*v2
 		accountType = v2.UserTrait_ACCOUNT_TYPE_HUMAN
 		status      v2.UserTrait_Status_Status
 	)
-	firstName, lastName := helpers.SplitFullName(user.GetName())
+	firstName, lastName := resource.SplitFullName(user.GetName())
 	profile := map[string]interface{}{
 		"name":       user.GetName(),
 		"email":      user.GetName(),
