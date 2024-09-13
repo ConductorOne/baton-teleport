@@ -104,7 +104,7 @@ jobs:
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != '' && env.CONNECTOR_PRINCIPAL_TYPE != ''
         run: | 
           ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --teleport-key-file auth.pem
-          ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --grant-entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --grant-principal ${{ env.CONNECTOR_PRINCIPAL }} --grant-principal-type ${{ env.CONNECTOR_PRINCIPAL_TYPE }}
+          ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --teleport-key-file auth.pem --grant-entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --grant-principal ${{ env.CONNECTOR_PRINCIPAL }} --grant-principal-type ${{ env.CONNECTOR_PRINCIPAL_TYPE }}
       - name: Check grant was re-granted
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
         run: |
