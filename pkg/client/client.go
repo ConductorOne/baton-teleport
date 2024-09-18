@@ -11,21 +11,22 @@ import (
 )
 
 type TeleportClient struct {
-	client    *teleport.Client
-	ProxyAddr string
+	client       *teleport.Client
+	ProxyAddress string
 }
 
 const initTimeout = time.Duration(10) * time.Second
 
-func New(ctx context.Context, proxyAddr string) (*TeleportClient, error) {
+func New(ctx context.Context, proxyAddress, keyFile string) (*TeleportClient, error) {
 	tc := &TeleportClient{
-		ProxyAddr: proxyAddr,
+		ProxyAddress: proxyAddress,
 	}
 	ctx, cancel := context.WithTimeout(ctx, initTimeout)
 	defer cancel()
-	creds := teleport.LoadIdentityFile("auth.pem")
+
+	creds := teleport.LoadIdentityFile(keyFile)
 	client, err := teleport.New(ctx, teleport.Config{
-		Addrs:       []string{proxyAddr},
+		Addrs:       []string{proxyAddress},
 		Credentials: []teleport.Credentials{creds},
 		DialOpts: []grpc.DialOption{
 			grpc.WithReturnConnectionError(),

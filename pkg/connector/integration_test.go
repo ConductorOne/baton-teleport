@@ -57,17 +57,17 @@ func getTestingClient(ctx context.Context, proxyAddr, filePath string) (*client.
 	return tc, nil
 }
 
-func NewTestingClient(ctx context.Context, proxyAddr, file string) (*client.TeleportClient, error) {
+func NewTestingClient(ctx context.Context, proxyAddress, keyFile string) (*client.TeleportClient, error) {
 	const initTimeout = time.Duration(10) * time.Second
 	tc := &client.TeleportClient{
-		ProxyAddr: proxyAddr,
+		ProxyAddress: proxyAddress,
 	}
 	ctx, cancel := context.WithTimeout(ctx, initTimeout)
 	defer cancel()
 
-	creds := teleport.LoadIdentityFile(file)
+	creds := teleport.LoadIdentityFile(keyFile)
 	client, err := teleport.New(ctx, teleport.Config{
-		Addrs:       []string{proxyAddr},
+		Addrs:       []string{proxyAddress},
 		Credentials: []teleport.Credentials{creds},
 		DialOpts: []grpc.DialOption{
 			grpc.WithReturnConnectionError(),
