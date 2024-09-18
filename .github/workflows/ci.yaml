@@ -52,7 +52,7 @@ jobs:
       CONNECTOR_ENTITLEMENT: 'role:reviewer:member'
       CONNECTOR_PRINCIPAL: 'miguel_chavez_m@hotmail.com'
       CONNECTOR_PRINCIPAL_TYPE: 'user'
-      TELEPORT_PROXY: 'conductorone-c2.teleport.sh:443'
+      TELEPORT_PROXY: ${{ secrets.PROXY }}
     steps:
       - name: Install Go
         uses: actions/setup-go@v4
