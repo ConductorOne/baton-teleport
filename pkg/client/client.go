@@ -7,7 +7,6 @@ import (
 	teleport "github.com/gravitational/teleport/api/client"
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
-	"google.golang.org/grpc"
 )
 
 type TeleportClient struct {
@@ -28,15 +27,12 @@ func New(ctx context.Context, proxyAddress, keyFile string) (*TeleportClient, er
 	client, err := teleport.New(ctx, teleport.Config{
 		Addrs:       []string{proxyAddress},
 		Credentials: []teleport.Credentials{creds},
-		DialOpts: []grpc.DialOption{
-			grpc.WithReturnConnectionError(),
-		},
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	tc.client = client
+	tc.SetClient(ctx, client)
 	return tc, nil
 }
 

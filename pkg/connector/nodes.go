@@ -21,12 +21,12 @@ type nodeBuilder struct {
 }
 
 type Node struct {
-	Id        int64
+	Id        string
 	Name      string
 	Namespace string
 }
 
-var mapNodes = make(map[int64]Node)
+var mapNodes = make(map[string]Node)
 
 func (n *nodeBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return n.resourceType
@@ -57,8 +57,9 @@ func (n *nodeBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 	}
 
 	for _, node := range nodes.GetResources() {
-		mapNodes[node.GetNode().GetResourceID()] = Node{
-			Id:        node.GetNode().GetResourceID(),
+		id := node.GetNode().GetRevision()
+		mapNodes[id] = Node{
+			Id:        id,
 			Name:      node.GetNode().GetName(),
 			Namespace: node.GetNode().GetNamespace(),
 		}

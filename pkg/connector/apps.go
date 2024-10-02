@@ -27,14 +27,15 @@ func (a *appBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 
 // Create a new connector resource for a Teleport node.
 func getAppResource(app types.Application) (*v2.Resource, error) {
+	appId := app.GetMetadata().Revision
 	return rs.NewRoleResource(
 		app.GetName(),
 		appResourceType,
-		app.GetMetadata().ID,
+		appId,
 		[]rs.RoleTraitOption{
 			rs.WithRoleProfile(
 				map[string]interface{}{
-					"app_id":   app.GetMetadata().ID,
+					"app_id":   appId,
 					"app_name": app.GetName(),
 				},
 			),

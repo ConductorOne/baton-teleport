@@ -17,6 +17,15 @@ limitations under the License.
 package samlsp
 
 const (
-	// GCP is a SAML service provider preset name for Google Cloud.
-	GCP = "gcp"
+	// GCPWorkforce is a SAML service provider preset name for Google Cloud Platform
+	// Workforce Identity Federation.
+	GCPWorkforce = "gcp-workforce"
+	// Unspecified preset type is used in the Web UI to denote a generic SAML service
+	// provider preset.
+	Unspecified = "unspecified"
+)
+
+const (
+	// DefaultRelayStateGCPWorkforce is a default relay state for GCPWorkforce preset.
+	DefaultRelayStateGCPWorkforce = "https://console.cloud.google/"
 )
