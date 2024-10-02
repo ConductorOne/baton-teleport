@@ -1,4 +1,4 @@
-//go:build piv
+//go:build piv && !pivtest
 
 /*
 Copyright 2022 Gravitational, Inc.
@@ -174,12 +174,12 @@ func nonTeleportCertificateMessage(slot piv.Slot, cert *x509.Certificate) string
 	fingerPrint := hex.EncodeToString(sum[:])
 	return fmt.Sprintf(`Certificate in YubiKey PIV slot %q is not a Teleport client cert:
 Slot %s:
-	Algorithm:		%v	
-	Subject DN:		%v	
-	Issuer DN:		%v	
-	Serial:			%v	
-	Fingerprint:	%v	
-	Not before:		%v	
+	Algorithm:		%v
+	Subject DN:		%v
+	Issuer DN:		%v
+	Serial:			%v
+	Fingerprint:	%v
+	Not before:		%v
 	Not after:		%v
 `,
 		slot, slot,
@@ -782,7 +782,7 @@ func SelfSignedMetadataCertificate(subject pkix.Name) (*x509.Certificate, error)
 // YubiKey 5 nano (5.2.7) and a YubiKey NFC (5.4.3).
 const (
 	// piv.ECDSAPrivateKey.Sign consistently takes ~70 milliseconds. However, 200ms
-	// should be imperceptible the the user and should avoid misfired prompts for
+	// should be imperceptible to the user and should avoid misfired prompts for
 	// slower cards (if there are any).
 	signTouchPromptDelay = time.Millisecond * 200
 )
@@ -874,4 +874,13 @@ func setPINAndPUKFromDefault(ctx context.Context, yk *piv.YubiKey) (string, erro
 	}
 
 	return pin, nil
+}
+
+// IsHardware returns true if [k] is a hardware PIV key.
+func (k *PrivateKey) IsHardware() bool {
+	switch k.Signer.(type) {
+	case *YubiKeyPrivateKey:
+		return true
+	}
+	return false
 }

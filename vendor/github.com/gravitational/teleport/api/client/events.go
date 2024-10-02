@@ -18,6 +18,16 @@ import (
 	"github.com/gravitational/trace"
 
 	"github.com/gravitational/teleport/api/client/proto"
+	accessmonitoringrulesv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/accessmonitoringrules/v1"
+	"github.com/gravitational/teleport/api/gen/proto/go/teleport/autoupdate/v1"
+	clusterconfigpb "github.com/gravitational/teleport/api/gen/proto/go/teleport/clusterconfig/v1"
+	crownjewelv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/crownjewel/v1"
+	dbobjectv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/dbobject/v1"
+	kubewaitingcontainerpb "github.com/gravitational/teleport/api/gen/proto/go/teleport/kubewaitingcontainer/v1"
+	machineidv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/machineid/v1"
+	notificationsv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/notifications/v1"
+	userprovisioningpb "github.com/gravitational/teleport/api/gen/proto/go/teleport/userprovisioning/v2"
+	usertasksv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/usertasks/v1"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/api/types/accesslist"
 	accesslistv1conv "github.com/gravitational/teleport/api/types/accesslist/convert/v1"
@@ -49,6 +59,63 @@ func EventToGRPC(in types.Event) (*proto.Event, error) {
 		return &out, nil
 	}
 	switch r := in.Resource.(type) {
+	case types.Resource153Unwrapper:
+		switch r := r.Unwrap().(type) {
+		case *kubewaitingcontainerpb.KubernetesWaitingContainer:
+			out.Resource = &proto.Event_KubernetesWaitingContainer{
+				KubernetesWaitingContainer: r,
+			}
+		case *notificationsv1.Notification:
+			out.Resource = &proto.Event_UserNotification{
+				UserNotification: r,
+			}
+		case *notificationsv1.GlobalNotification:
+			out.Resource = &proto.Event_GlobalNotification{
+				GlobalNotification: r,
+			}
+		case *accessmonitoringrulesv1.AccessMonitoringRule:
+			out.Resource = &proto.Event_AccessMonitoringRule{
+				AccessMonitoringRule: r,
+			}
+		case *crownjewelv1.CrownJewel:
+			out.Resource = &proto.Event_CrownJewel{
+				CrownJewel: r,
+			}
+		case *dbobjectv1.DatabaseObject:
+			out.Resource = &proto.Event_DatabaseObject{
+				DatabaseObject: r,
+			}
+		case *machineidv1.BotInstance:
+			out.Resource = &proto.Event_BotInstance{
+				BotInstance: r,
+			}
+		case *clusterconfigpb.AccessGraphSettings:
+			out.Resource = &proto.Event_AccessGraphSettings{
+				AccessGraphSettings: r,
+			}
+		case *machineidv1.SPIFFEFederation:
+			out.Resource = &proto.Event_SPIFFEFederation{
+				SPIFFEFederation: r,
+			}
+		case *userprovisioningpb.StaticHostUser:
+			out.Resource = &proto.Event_StaticHostUserV2{
+				StaticHostUserV2: r,
+			}
+		case *autoupdate.AutoUpdateConfig:
+			out.Resource = &proto.Event_AutoUpdateConfig{
+				AutoUpdateConfig: r,
+			}
+		case *autoupdate.AutoUpdateVersion:
+			out.Resource = &proto.Event_AutoUpdateVersion{
+				AutoUpdateVersion: r,
+			}
+		case *usertasksv1.UserTask:
+			out.Resource = &proto.Event_UserTask{
+				UserTask: r,
+			}
+		default:
+			return nil, trace.BadParameter("resource type %T is not supported", r)
+		}
 	case *types.ResourceHeader:
 		out.Resource = &proto.Event_ResourceHeader{
 			ResourceHeader: r,
@@ -406,7 +473,10 @@ func EventFromGRPC(in *proto.Event) (*types.Event, error) {
 		out.Resource = r
 		return &out, nil
 	} else if r := in.GetAccessList(); r != nil {
-		out.Resource, err = accesslistv1conv.FromProto(r)
+		out.Resource, err = accesslistv1conv.FromProto(
+			r,
+			accesslistv1conv.WithOwnersIneligibleStatusField(r.GetSpec().GetOwners()),
+		)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
@@ -418,7 +488,10 @@ func EventFromGRPC(in *proto.Event) (*types.Event, error) {
 		}
 		return &out, nil
 	} else if r := in.GetAccessListMember(); r != nil {
-		out.Resource, err = accesslistv1conv.FromMemberProto(r)
+		out.Resource, err = accesslistv1conv.FromMemberProto(
+			r,
+			accesslistv1conv.WithMemberIneligibleStatusField(r),
+		)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
@@ -452,6 +525,45 @@ func EventFromGRPC(in *proto.Event) (*types.Event, error) {
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
+		return &out, nil
+	} else if r := in.GetKubernetesWaitingContainer(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetUserNotification(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetGlobalNotification(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetAccessMonitoringRule(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetCrownJewel(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetDatabaseObject(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetBotInstance(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetAccessGraphSettings(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetSPIFFEFederation(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetStaticHostUserV2(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetAutoUpdateConfig(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetAutoUpdateVersion(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
+		return &out, nil
+	} else if r := in.GetUserTask(); r != nil {
+		out.Resource = types.Resource153ToLegacy(r)
 		return &out, nil
 	} else {
 		return nil, trace.BadParameter("received unsupported resource %T", in.Resource)
