@@ -29,7 +29,7 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 	profile := map[string]interface{}{
 		"name":       user.GetName(),
 		"email":      user.GetName(),
-		"user_id":    user.GetMetadata().ID,
+		"user_id":    user.GetMetadata().Revision,
 		"first_name": firstName,
 		"last_name":  lastName,
 	}

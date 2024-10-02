@@ -30,15 +30,16 @@ func (r *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 
 // Create a new connector resource for a Teleport role.
 func getRoleResource(role types.Role) (*v2.Resource, error) {
+	roleName := role.GetMetadata().Name
 	return rs.NewRoleResource(
 		role.GetName(),
 		roleResourceType,
-		role.GetMetadata().Name,
+		roleName,
 		[]rs.RoleTraitOption{
 			rs.WithRoleProfile(
 				map[string]interface{}{
-					"role_id":          role.GetMetadata().ID,
-					"role_name":        role.GetMetadata().Name,
+					"role_id":          role.GetMetadata().Revision,
+					"role_name":        roleName,
 					"role_description": role.GetMetadata().Description,
 				},
 			),
