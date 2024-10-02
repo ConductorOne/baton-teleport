@@ -6,7 +6,7 @@ import (
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 )
 
-// Populate entitlement options for teleport resource.
+// PopulateOptions - Populate entitlement options for teleport resource.
 func PopulateOptions(displayName, permission, resource string) []ent.EntitlementOption {
 	options := []ent.EntitlementOption{
 		ent.WithDisplayName(fmt.Sprintf("%s Role %s", displayName, permission)),

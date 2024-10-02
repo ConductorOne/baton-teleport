@@ -27,26 +27,19 @@ func (d *dbBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 
 // Create a new connector resource for a Teleport node.
 func getDatabaseResource(db types.Database) (*v2.Resource, error) {
-	profile := map[string]interface{}{
-		"db_id":   db.GetResourceID(),
-		"db_name": db.GetName(),
-	}
-
-	dbTraitOptions := []rs.RoleTraitOption{
-		rs.WithRoleProfile(profile),
-	}
-
-	ret, err := rs.NewRoleResource(
+	return rs.NewRoleResource(
 		db.GetName(),
 		dbResourceType,
 		db.GetResourceID(),
-		dbTraitOptions,
+		[]rs.RoleTraitOption{
+			rs.WithRoleProfile(
+				map[string]interface{}{
+					"db_id":   db.GetResourceID(),
+					"db_name": db.GetName(),
+				},
+			),
+		},
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	return ret, nil
 }
 
 // List returns all the databases from the database as resource objects.
@@ -71,20 +64,15 @@ func (d *dbBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pa
 }
 
 func (d *dbBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
-	var rv []*v2.Entitlement
-	assignmentOptions := []ent.EntitlementOption{
-		ent.WithGrantableTo(userResourceType),
-		ent.WithDisplayName(fmt.Sprintf("%s Database %s", resource.DisplayName, dbMembership)),
-		ent.WithDescription(fmt.Sprintf("Member of %s Teleport db", resource.DisplayName)),
-	}
-
-	rv = append(rv, ent.NewAssignmentEntitlement(
-		resource,
-		dbMembership,
-		assignmentOptions...,
-	))
-
-	return rv, "", nil, nil
+	return []*v2.Entitlement{
+		ent.NewAssignmentEntitlement(
+			resource,
+			dbMembership,
+			ent.WithGrantableTo(userResourceType),
+			ent.WithDisplayName(fmt.Sprintf("%s Database %s", resource.DisplayName, dbMembership)),
+			ent.WithDescription(fmt.Sprintf("Member of %s Teleport db", resource.DisplayName)),
+		),
+	}, "", nil, nil
 }
 
 func (d *dbBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
