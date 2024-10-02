@@ -46,69 +46,34 @@ func (t *TeleportClient) SetClient(ctx context.Context, c *teleport.Client) {
 
 // GetUsers fetch users list.
 func (t *TeleportClient) GetUsers(ctx context.Context) ([]types.User, error) {
-	users, err := t.client.GetUsers(ctx, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return users, nil
+	return t.client.GetUsers(ctx, false)
 }
 
 // GetRoles fetch roles list.
 func (t *TeleportClient) GetRoles(ctx context.Context) ([]types.Role, error) {
-	roles, err := t.client.GetRoles(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return roles, nil
+	return t.client.GetRoles(ctx)
 }
 
-// GetUser gets an user.
+// GetUser gets a user.
 func (t *TeleportClient) GetUser(ctx context.Context, username string) (types.User, error) {
-	user, err := t.client.GetUser(ctx, username, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return t.client.GetUser(ctx, username, false)
 }
 
-// UpdateUserRole updates an user.
+// UpdateUserRole updates a user.
 func (t *TeleportClient) UpdateUserRole(ctx context.Context, user types.User) (types.User, error) {
-	updatedUser, err := t.client.UpdateUser(ctx, user.(*types.UserV2))
-	if err != nil {
-		return nil, err
-	}
-
-	return updatedUser, nil
+	return t.client.UpdateUser(ctx, user.(*types.UserV2))
 }
 
 func (t *TeleportClient) GetNodes(ctx context.Context) (*proto.ListResourcesResponse, error) {
-	nodes, err := t.client.GetResources(ctx, &proto.ListResourcesRequest{
+	return t.client.GetResources(ctx, &proto.ListResourcesRequest{
 		ResourceType: types.KindNode,
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	return nodes, nil
 }
 
 func (t *TeleportClient) GetApps(ctx context.Context) ([]types.Application, error) {
-	apps, err := t.client.GetApps(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return apps, nil
+	return t.client.GetApps(ctx)
 }
 
 func (t *TeleportClient) GetDatabases(ctx context.Context) ([]types.Database, error) {
-	databases, err := t.client.GetDatabases(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return databases, nil
+	return t.client.GetDatabases(ctx)
 }

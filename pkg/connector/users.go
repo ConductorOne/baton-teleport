@@ -20,7 +20,7 @@ func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return userResourceType
 }
 
-func userResource(ctx context.Context, pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
+func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 	var (
 		accountType = v2.UserTrait_ACCOUNT_TYPE_HUMAN
 		status      v2.UserTrait_Status_Status
@@ -47,7 +47,7 @@ func userResource(ctx context.Context, pId *v2.ResourceId, user types.User) (*v2
 		status = v2.UserTrait_Status_STATUS_UNSPECIFIED
 	}
 
-	resource, err := resource.NewUserResource(
+	return resource.NewUserResource(
 		user.GetName(),
 		userResourceType,
 		user.GetName(),
@@ -60,12 +60,6 @@ func userResource(ctx context.Context, pId *v2.ResourceId, user types.User) (*v2
 		},
 		resource.WithParentResourceID(pId),
 	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return resource, nil
 }
 
 // List returns all the users from the database as resource objects.
@@ -82,7 +76,7 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		if user.GetStatus().IsLocked || user.IsBot() {
 			continue
 		}
-		ur, err := userResource(ctx, parentResourceID, userCopy)
+		ur, err := userResource(parentResourceID, userCopy)
 		if err != nil {
 			return nil, "", nil, err
 		}
