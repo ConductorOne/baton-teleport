@@ -42,9 +42,11 @@ func main() {
 
 func getConnector(ctx context.Context, cfg *viper.Viper) (types.ConnectorServer, error) {
 	l := ctxzap.Extract(ctx)
-	cb, err := connector.New(ctx,
+	cb, err := connector.New(
+		ctx,
 		cfg.GetString(config.ProxyAddressField.FieldName),
-		cfg.GetString(config.TeleportKeyFileField.FieldName),
+		cfg.GetString(config.TeleportKeyFilePathField.FieldName),
+		cfg.GetString(config.TeleportKeyField.FieldName),
 	)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
