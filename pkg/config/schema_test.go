@@ -30,7 +30,7 @@ func TestConfigSchema(t *testing.T) {
 				"both private key types",
 			},
 			{
-				"--teleport-proxy-address 1--teleport-key-file-path 1",
+				"--teleport-proxy-address 1 --teleport-key-file-path 1",
 				true,
 				"private key path",
 			},
