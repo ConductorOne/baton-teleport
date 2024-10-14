@@ -3,7 +3,7 @@ module github.com/conductorone/baton-teleport
 go 1.22.0
 
 require (
-	github.com/conductorone/baton-sdk v0.2.25
+	github.com/conductorone/baton-sdk v0.2.41
 	github.com/gravitational/teleport/api v0.0.0-20240307211713-29e1e5bc142c
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/spf13/viper v1.18.2
