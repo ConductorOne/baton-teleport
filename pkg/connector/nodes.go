@@ -51,6 +51,7 @@ func getNodeResource(node *Node) (*v2.Resource, error) {
 // Nodes include a NodeTrait because they are the 'shape' of a standard node.
 func (n *nodeBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
+	// TODO: client.GetNodes calls GetResources, which is paginated. we need to handle pagination here
 	nodes, err := n.client.GetNodes(ctx)
 	if err != nil {
 		return nil, "", nil, err
@@ -89,10 +90,12 @@ func (r *nodeBuilder) Entitlements(ctx context.Context, resource *v2.Resource, t
 	}, "", nil, nil
 }
 
+// TODO: This should return grants based on who has access to the node resource
 func (r *nodeBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	return nil, "", nil, nil
 }
 
+// TODO: these should either grant/revoke access to a node, or we shouldn't implement them
 func (r *nodeBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	return nil, nil
 }
