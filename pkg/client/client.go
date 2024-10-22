@@ -27,14 +27,16 @@ func New(ctx context.Context, proxyAddress, keyFile, key string) (*TeleportClien
 	defer cancel()
 
 	var creds teleport.Credentials
-	if keyFile != "" {
+	switch {
+	case keyFile != "":
 		creds = teleport.LoadIdentityFile(keyFile)
-	} else if key != "" {
+	case key != "":
 		creds = teleport.LoadIdentityFileFromString(key)
-	} else {
+	default:
 		return nil, ErrNoKeyProvided
 	}
 
+	// TODO: Dial opts are deprecated. We also need to add a default port in proxyAddress if one doesn't exist (to avoid an info message)
 	client, err := teleport.New(ctx, teleport.Config{
 		Addrs:       []string{proxyAddress},
 		Credentials: []teleport.Credentials{creds},
@@ -53,6 +55,8 @@ func New(ctx context.Context, proxyAddress, keyFile, key string) (*TeleportClien
 func (t *TeleportClient) SetClient(ctx context.Context, c *teleport.Client) {
 	t.client = c
 }
+
+// TODO: why wrap every client method? We should probably just make the client public
 
 // GetUsers fetch users list.
 func (t *TeleportClient) GetUsers(ctx context.Context) ([]types.User, error) {
