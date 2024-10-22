@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	teleport "github.com/gravitational/teleport/api/client"
@@ -14,19 +15,32 @@ type TeleportClient struct {
 	ProxyAddress string
 }
 
+var ErrNoKeyProvided = errors.New("no key provided")
+
 const initTimeout = time.Duration(10) * time.Second
 
-func New(ctx context.Context, proxyAddress, keyFile string) (*TeleportClient, error) {
+func New(ctx context.Context, proxyAddress, keyFile, key string) (*TeleportClient, error) {
 	tc := &TeleportClient{
 		ProxyAddress: proxyAddress,
 	}
 	ctx, cancel := context.WithTimeout(ctx, initTimeout)
 	defer cancel()
 
-	creds := teleport.LoadIdentityFile(keyFile)
+	var creds teleport.Credentials
+	if keyFile != "" {
+		creds = teleport.LoadIdentityFile(keyFile)
+	} else if key != "" {
+		creds = teleport.LoadIdentityFileFromString(key)
+	} else {
+		return nil, ErrNoKeyProvided
+	}
+
 	client, err := teleport.New(ctx, teleport.Config{
 		Addrs:       []string{proxyAddress},
 		Credentials: []teleport.Credentials{creds},
+		// DialOpts: []grpc.DialOption{
+		// 	grpc.WithReturnConnectionError(),
+		// },
 	})
 	if err != nil {
 		return nil, err
