@@ -3,11 +3,13 @@ package connector
 import (
 	"context"
 	"io"
+	"os"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-teleport/pkg/client"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
 
 type Connector struct {
@@ -46,8 +48,30 @@ func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, erro
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, proxyAddress, keyFile string) (*Connector, error) {
-	tc, err := client.New(ctx, proxyAddress, keyFile)
+func New(
+	ctx context.Context,
+	proxyAddress string,
+	keyFilePath string,
+	key string,
+) (*Connector, error) {
+	logger := ctxzap.Extract(ctx)
+	if keyFilePath == "" {
+		logger.Debug("keyFilePath was not set, using raw key")
+		file, err := os.CreateTemp("", "key-*.pem")
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close() // Ensure file is closed
+
+		_, err = file.WriteString(key)
+		if err != nil {
+			return nil, err
+		}
+
+		keyFilePath = file.Name()
+	}
+
+	tc, err := client.New(ctx, proxyAddress, keyFilePath)
 	if err != nil {
 		return nil, err
 	}
