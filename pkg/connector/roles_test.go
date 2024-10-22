@@ -27,7 +27,7 @@ func TestRoles(t *testing.T) {
 		t.Skip()
 	}
 
-	cliTest, err := client.New(ctx, proxyAddrTest, filePathTest)
+	cliTest, err := client.New(ctx, proxyAddrTest, filePathTest, "")
 	require.Nil(t, err)
 
 	r := &roleBuilder{
