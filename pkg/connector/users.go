@@ -34,6 +34,7 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 		"last_name":  lastName,
 	}
 
+	// TODO: IsBot is false for @teleport-access-approval-bot
 	if user.IsBot() {
 		accountType = v2.UserTrait_ACCOUNT_TYPE_SERVICE
 	}
@@ -53,6 +54,7 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 		user.GetName(),
 		[]resource.UserTraitOption{
 			resource.WithUserProfile(profile),
+			// TODO: This is not always an email address, at least not for @teleport-access-approval-bot or bots
 			resource.WithEmail(user.GetName(), true),
 			resource.WithUserLogin(user.GetName()),
 			resource.WithStatus(status),
@@ -73,9 +75,6 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 
 	for _, user := range users {
 		userCopy := user
-		if user.GetStatus().IsLocked || user.IsBot() {
-			continue
-		}
 		ur, err := userResource(parentResourceID, userCopy)
 		if err != nil {
 			return nil, "", nil, err

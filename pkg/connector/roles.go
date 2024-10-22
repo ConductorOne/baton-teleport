@@ -89,10 +89,6 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 
 	for _, user := range users {
 		userCopy := user
-		if user.GetStatus().IsLocked || user.IsBot() {
-			continue
-		}
-
 		ur, err := userResource(resource.Id, userCopy)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("error creating user resource for role %s: %w", resource.Id.Resource, err)
