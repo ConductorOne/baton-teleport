@@ -57,7 +57,9 @@ func TestRoles(t *testing.T) {
 		entitlement := GetEntitlementForTesting(resource, roleName, roleEntitlement)
 		require.NotNil(t, entitlement)
 
-		// --grant-entitlement "role:reviewer:member" --grant-principal-type user --grant-principal "miguel_chavez_m@hotmail.com"
+		// --grant-entitlement "role:reviewer:member" \
+		//   --grant-principal-type user \
+		//   --grant-principal "miguel_chavez_m@hotmail.com"
 		_, err = r.Grant(ctx, principal, entitlement)
 		require.Nil(t, err)
 	})
