@@ -7,6 +7,7 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
+	"github.com/conductorone/baton-teleport/pkg/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +27,7 @@ func TestRoles(t *testing.T) {
 		t.Skip()
 	}
 
-	cliTest, err := NewTestingClient(ctx, proxyAddrTest, filePathTest)
+	cliTest, err := client.New(ctx, proxyAddrTest, filePathTest)
 	require.Nil(t, err)
 
 	r := &roleBuilder{

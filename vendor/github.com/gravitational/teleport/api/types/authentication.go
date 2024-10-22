@@ -18,20 +18,43 @@ package types
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gravitational/trace"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/gravitational/teleport/api/constants"
 	"github.com/gravitational/teleport/api/defaults"
+	"github.com/gravitational/teleport/api/utils"
 	"github.com/gravitational/teleport/api/utils/keys"
 	"github.com/gravitational/teleport/api/utils/tlsutils"
+)
+
+var (
+	// ErrPasswordlessRequiresWebauthn is issued if a passwordless challenge is
+	// requested but WebAuthn isn't enabled.
+	ErrPasswordlessRequiresWebauthn = &trace.BadParameterError{
+		Message: "passwordless requires WebAuthn",
+	}
+
+	// ErrPasswordlessDisabledBySettings is issued if a passwordless challenge is
+	// requested but passwordless is disabled by cluster settings.
+	// See AuthPreferenceV2.AuthPreferenceV2.
+	ErrPasswordlessDisabledBySettings = &trace.BadParameterError{
+		Message: "passwordless disabled by cluster settings",
+	}
+
+	// ErrPassswordlessLoginBySSOUser is issued if an SSO user tries to login
+	// using passwordless.
+	ErrPassswordlessLoginBySSOUser = &trace.AccessDeniedError{
+		Message: "SSO user cannot login using passwordless",
+	}
 )
 
 // AuthPreference defines the authentication preferences for a specific
@@ -94,8 +117,11 @@ type AuthPreference interface {
 	// SetAllowHeadless sets the value of the allow headless setting.
 	SetAllowHeadless(b bool)
 
+	// SetRequireMFAType sets the type of MFA requirement enforced for this cluster.
+	SetRequireMFAType(RequireMFAType)
 	// GetRequireMFAType returns the type of MFA requirement enforced for this cluster.
 	GetRequireMFAType() RequireMFAType
+
 	// GetPrivateKeyPolicy returns the configured private key policy for the cluster.
 	GetPrivateKeyPolicy() keys.PrivateKeyPolicy
 
@@ -148,8 +174,23 @@ type AuthPreference interface {
 	// SetOktaSyncPeriod sets the duration between Okta synchronzation calls.
 	SetOktaSyncPeriod(timeBetweenSyncs time.Duration)
 
+	// GetSignatureAlgorithmSuite gets the signature algorithm suite.
+	GetSignatureAlgorithmSuite() SignatureAlgorithmSuite
+	// SetSignatureAlgorithmSuite sets the signature algorithm suite.
+	SetSignatureAlgorithmSuite(SignatureAlgorithmSuite)
+	// SetDefaultSignatureAlgorithmSuite sets default signature algorithm suite
+	// based on the params. This is meant for a default auth preference in a
+	// brand new cluster or after resetting the auth preference.
+	SetDefaultSignatureAlgorithmSuite(SignatureAlgorithmSuiteParams)
+	// CheckSignatureAlgorithmSuite returns an error if the current signature
+	// algorithm suite is incompatible with [params].
+	CheckSignatureAlgorithmSuite(SignatureAlgorithmSuiteParams) error
+
 	// String represents a human readable version of authentication settings.
 	String() string
+
+	// Clone makes a deep copy of the AuthPreference.
+	Clone() AuthPreference
 }
 
 // NewAuthPreference is a convenience method to to create AuthPreferenceV2.
@@ -182,7 +223,15 @@ func newAuthPreferenceWithLabels(spec AuthPreferenceSpecV2, labels map[string]st
 
 // DefaultAuthPreference returns the default authentication preferences.
 func DefaultAuthPreference() AuthPreference {
-	authPref, _ := newAuthPreferenceWithLabels(AuthPreferenceSpecV2{}, map[string]string{
+	authPref, _ := newAuthPreferenceWithLabels(AuthPreferenceSpecV2{
+		// This is useful as a static value, but the real default signature
+		// algorithm suite depends on the cluster FIPS and HSM settings, and
+		// gets written by [AuthPreferenceV2.SetDefaultSignatureAlgorithmSuite]
+		// wherever a default auth preference will actually be persisted.
+		// It is set here so that many existing tests using this get the
+		// benefits of the balanced-v1 suite.
+		SignatureAlgorithmSuite: SignatureAlgorithmSuite_SIGNATURE_ALGORITHM_SUITE_BALANCED_V1,
+	}, map[string]string{
 		OriginLabel: OriginDefaults,
 	})
 	return authPref
@@ -216,16 +265,6 @@ func (c *AuthPreferenceV2) Expiry() time.Time {
 // GetMetadata returns object metadata.
 func (c *AuthPreferenceV2) GetMetadata() Metadata {
 	return c.Metadata
-}
-
-// GetResourceID returns resource ID.
-func (c *AuthPreferenceV2) GetResourceID() int64 {
-	return c.Metadata.ID
-}
-
-// SetResourceID sets resource ID.
-func (c *AuthPreferenceV2) SetResourceID(id int64) {
-	c.Metadata.ID = id
 }
 
 // GetRevision returns the revision
@@ -298,7 +337,7 @@ func (c *AuthPreferenceV2) GetPreferredLocalMFA() constants.SecondFactorType {
 		}
 		return constants.SecondFactorOTP
 	default:
-		log.Warnf("Unexpected second_factor setting: %v", sf)
+		slog.WarnContext(context.Background(), "Found unknown second_factor setting", "second_factor", sf)
 		return "" // Unsure, say nothing.
 	}
 }
@@ -323,7 +362,7 @@ func (c *AuthPreferenceV2) IsSecondFactorWebauthnAllowed() bool {
 	case trace.IsNotFound(err): // OK, expected to happen in some cases.
 		return false
 	case err != nil:
-		log.WithError(err).Warnf("Got unexpected error when reading Webauthn config")
+		slog.WarnContext(context.Background(), "Got unexpected error when reading Webauthn config", "error", err)
 		return false
 	}
 
@@ -333,10 +372,10 @@ func (c *AuthPreferenceV2) IsSecondFactorWebauthnAllowed() bool {
 		c.Spec.SecondFactor == constants.SecondFactorOn
 }
 
-// IsAdminActionMFAEnforced checks if admin action MFA is enforced. Currently, the only
-// prerequisite for admin action MFA enforcement is whether Webauthn is enforced.
+// IsAdminActionMFAEnforced checks if admin action MFA is enforced.
 func (c *AuthPreferenceV2) IsAdminActionMFAEnforced() bool {
-	return c.Spec.SecondFactor == constants.SecondFactorWebauthn
+	// OTP is not supported for Admin MFA.
+	return c.IsSecondFactorEnforced() && !c.IsSecondFactorTOTPAllowed()
 }
 
 // GetConnectorName gets the name of the OIDC or SAML connector to use. If
@@ -389,6 +428,11 @@ func (c *AuthPreferenceV2) GetAllowHeadless() bool {
 
 func (c *AuthPreferenceV2) SetAllowHeadless(b bool) {
 	c.Spec.AllowHeadless = NewBoolOption(b)
+}
+
+// SetRequireMFAType sets the type of MFA requirement enforced for this cluster.
+func (c *AuthPreferenceV2) SetRequireMFAType(t RequireMFAType) {
+	c.Spec.RequireMFAType = t
 }
 
 // GetRequireMFAType returns the type of MFA requirement enforced for this cluster.
@@ -528,6 +572,71 @@ func (c *AuthPreferenceV2) setStaticFields() {
 	c.Metadata.Name = MetaNameClusterAuthPreference
 }
 
+// GetSignatureAlgorithmSuite gets the signature algorithm suite.
+func (c *AuthPreferenceV2) GetSignatureAlgorithmSuite() SignatureAlgorithmSuite {
+	return c.Spec.SignatureAlgorithmSuite
+}
+
+// SetSignatureAlgorithmSuite sets the signature algorithm suite.
+func (c *AuthPreferenceV2) SetSignatureAlgorithmSuite(suite SignatureAlgorithmSuite) {
+	c.Spec.SignatureAlgorithmSuite = suite
+}
+
+// SignatureAlgorithmSuiteParams is a set of parameters used to determine if a
+// configured signature algorithm suite is valid, or to set a default signature
+// algorithm suite.
+type SignatureAlgorithmSuiteParams struct {
+	// FIPS should be true if running in FIPS mode.
+	FIPS bool
+	// UsingHSMOrKMS should be true if the auth server is configured to
+	// use an HSM or KMS.
+	UsingHSMOrKMS bool
+}
+
+// SetDefaultSignatureAlgorithmSuite sets default signature algorithm suite
+// based on the params. This is meant for a default auth preference in a
+// brand new cluster or after resetting the auth preference.
+func (c *AuthPreferenceV2) SetDefaultSignatureAlgorithmSuite(params SignatureAlgorithmSuiteParams) {
+	switch {
+	case params.FIPS:
+		c.SetSignatureAlgorithmSuite(SignatureAlgorithmSuite_SIGNATURE_ALGORITHM_SUITE_FIPS_V1)
+	case params.UsingHSMOrKMS:
+		c.SetSignatureAlgorithmSuite(SignatureAlgorithmSuite_SIGNATURE_ALGORITHM_SUITE_HSM_V1)
+	default:
+		c.SetSignatureAlgorithmSuite(SignatureAlgorithmSuite_SIGNATURE_ALGORITHM_SUITE_BALANCED_V1)
+	}
+}
+
+var (
+	errNonFIPSSignatureAlgorithmSuite = &trace.BadParameterError{Message: `non-FIPS compliant authentication setting: "signature_algorithm_suite" must be "fips-v1" or "legacy"`}
+	errNonHSMSignatureAlgorithmSuite  = &trace.BadParameterError{Message: `configured "signature_algorithm_suite" is unsupported when "ca_key_params" configures an HSM or KMS, supported values: ["hsm-v1", "fips-v1", "legacy"]`}
+)
+
+// CheckSignatureAlgorithmSuite returns an error if the current signature
+// algorithm suite is incompatible with [params].
+func (c *AuthPreferenceV2) CheckSignatureAlgorithmSuite(params SignatureAlgorithmSuiteParams) error {
+	switch c.GetSignatureAlgorithmSuite() {
+	case SignatureAlgorithmSuite_SIGNATURE_ALGORITHM_SUITE_UNSPECIFIED,
+		SignatureAlgorithmSuite_SIGNATURE_ALGORITHM_SUITE_LEGACY,
+		SignatureAlgorithmSuite_SIGNATURE_ALGORITHM_SUITE_FIPS_V1:
+		// legacy, fips-v1, and unspecified are always valid.
+	case SignatureAlgorithmSuite_SIGNATURE_ALGORITHM_SUITE_HSM_V1:
+		if params.FIPS {
+			return trace.Wrap(errNonFIPSSignatureAlgorithmSuite)
+		}
+	case SignatureAlgorithmSuite_SIGNATURE_ALGORITHM_SUITE_BALANCED_V1:
+		if params.FIPS {
+			return trace.Wrap(errNonFIPSSignatureAlgorithmSuite)
+		}
+		if params.UsingHSMOrKMS {
+			return trace.Wrap(errNonHSMSignatureAlgorithmSuite)
+		}
+	default:
+		return trace.Errorf("unhandled signature_algorithm_suite %q: this is a bug", c.GetSignatureAlgorithmSuite())
+	}
+	return nil
+}
+
 // CheckAndSetDefaults verifies the constraints for AuthPreference.
 func (c *AuthPreferenceV2) CheckAndSetDefaults() error {
 	c.setStaticFields()
@@ -568,10 +677,11 @@ func (c *AuthPreferenceV2) CheckAndSetDefaults() error {
 	}
 
 	if c.Spec.SecondFactor == constants.SecondFactorU2F {
-		log.Warnf(`` +
+		const deprecationMessage = `` +
 			`Second Factor "u2f" is deprecated and marked for removal, using "webauthn" instead. ` +
 			`Please update your configuration to use WebAuthn. ` +
-			`Refer to https://goteleport.com/docs/access-controls/guides/webauthn/`)
+			`Refer to https://goteleport.com/docs/access-controls/guides/webauthn/`
+		slog.WarnContext(context.Background(), deprecationMessage)
 		c.Spec.SecondFactor = constants.SecondFactorWebauthn
 	}
 
@@ -738,6 +848,11 @@ func (c *AuthPreferenceV2) String() string {
 	return fmt.Sprintf("AuthPreference(Type=%q,SecondFactor=%q)", c.Spec.Type, c.Spec.SecondFactor)
 }
 
+// Clone returns a copy of the AuthPreference resource.
+func (c *AuthPreferenceV2) Clone() AuthPreference {
+	return utils.CloneProtoMsg(c)
+}
+
 func (u *U2F) Check() error {
 	if u.AppID == "" {
 		return trace.BadParameter("u2f configuration missing app_id")
@@ -775,7 +890,7 @@ func (w *Webauthn) CheckAndSetDefaults(u *U2F) error {
 		default:
 			return trace.BadParameter("failed to infer webauthn RPID from U2F App ID (%q)", u.AppID)
 		}
-		log.Infof("WebAuthn: RPID inferred from U2F configuration: %q", rpID)
+		slog.InfoContext(context.Background(), "WebAuthn: RPID inferred from U2F configuration", "rpid", rpID)
 		w.RPID = rpID
 	default:
 		return trace.BadParameter("webauthn configuration missing rp_id")
@@ -784,7 +899,7 @@ func (w *Webauthn) CheckAndSetDefaults(u *U2F) error {
 	// AttestationAllowedCAs.
 	switch {
 	case u != nil && len(u.DeviceAttestationCAs) > 0 && len(w.AttestationAllowedCAs) == 0 && len(w.AttestationDeniedCAs) == 0:
-		log.Infof("WebAuthn: using U2F device attestation CAs as allowed CAs")
+		slog.InfoContext(context.Background(), "WebAuthn: using U2F device attestation CAs as allowed CAs")
 		w.AttestationAllowedCAs = u.DeviceAttestationCAs
 	default:
 		for _, pem := range w.AttestationAllowedCAs {
@@ -888,8 +1003,6 @@ func (d *MFADevice) GetVersion() string      { return d.Version }
 func (d *MFADevice) GetMetadata() Metadata   { return d.Metadata }
 func (d *MFADevice) GetName() string         { return d.Metadata.GetName() }
 func (d *MFADevice) SetName(n string)        { d.Metadata.SetName(n) }
-func (d *MFADevice) GetResourceID() int64    { return d.Metadata.GetID() }
-func (d *MFADevice) SetResourceID(id int64)  { d.Metadata.SetID(id) }
 func (d *MFADevice) GetRevision() string     { return d.Metadata.GetRevision() }
 func (d *MFADevice) SetRevision(rev string)  { d.Metadata.SetRevision(rev) }
 func (d *MFADevice) Expiry() time.Time       { return d.Metadata.Expiry() }
