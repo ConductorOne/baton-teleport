@@ -21,12 +21,12 @@ type nodeBuilder struct {
 }
 
 type Node struct {
-	Id        int64
+	Id        string
 	Name      string
 	Namespace string
 }
 
-var mapNodes = make(map[int64]Node)
+var mapNodes = make(map[string]Node)
 
 func (n *nodeBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return n.resourceType
@@ -34,26 +34,17 @@ func (n *nodeBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 
 // Create a new connector resource for a Teleport node.
 func getNodeResource(node *Node) (*v2.Resource, error) {
-	profile := map[string]interface{}{
-		"node_id":   node.Id,
-		"node_name": node.Name,
-	}
-
-	nodeTraitOptions := []rs.RoleTraitOption{
-		rs.WithRoleProfile(profile),
-	}
-
-	ret, err := rs.NewRoleResource(
+	return rs.NewRoleResource(
 		node.Name,
 		nodeResourceType,
 		node.Id,
-		nodeTraitOptions,
+		[]rs.RoleTraitOption{
+			rs.WithRoleProfile(map[string]interface{}{
+				"node_id":   node.Id,
+				"node_name": node.Name,
+			}),
+		},
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	return ret, nil
 }
 
 // List returns all the nodes from the database as resource objects.
@@ -66,8 +57,9 @@ func (n *nodeBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 	}
 
 	for _, node := range nodes.GetResources() {
-		mapNodes[node.GetNode().GetResourceID()] = Node{
-			Id:        node.GetNode().GetResourceID(),
+		id := node.GetNode().GetRevision()
+		mapNodes[id] = Node{
+			Id:        id,
 			Name:      node.GetNode().GetName(),
 			Namespace: node.GetNode().GetNamespace(),
 		}
@@ -86,20 +78,15 @@ func (n *nodeBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 }
 
 func (r *nodeBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
-	var rv []*v2.Entitlement
-	assignmentOptions := []ent.EntitlementOption{
-		ent.WithGrantableTo(userResourceType),
-		ent.WithDisplayName(fmt.Sprintf("%s Node %s", resource.DisplayName, nodeMembership)),
-		ent.WithDescription(fmt.Sprintf("Member of %s Teleport node", resource.DisplayName)),
-	}
-
-	rv = append(rv, ent.NewAssignmentEntitlement(
-		resource,
-		nodeMembership,
-		assignmentOptions...,
-	))
-
-	return rv, "", nil, nil
+	return []*v2.Entitlement{
+		ent.NewAssignmentEntitlement(
+			resource,
+			nodeMembership,
+			ent.WithGrantableTo(userResourceType),
+			ent.WithDisplayName(fmt.Sprintf("%s Node %s", resource.DisplayName, nodeMembership)),
+			ent.WithDescription(fmt.Sprintf("Member of %s Teleport node", resource.DisplayName)),
+		),
+	}, "", nil, nil
 }
 
 func (r *nodeBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {

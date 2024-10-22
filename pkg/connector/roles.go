@@ -30,27 +30,21 @@ func (r *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 
 // Create a new connector resource for a Teleport role.
 func getRoleResource(role types.Role) (*v2.Resource, error) {
-	profile := map[string]interface{}{
-		"role_id":          role.GetMetadata().ID,
-		"role_name":        role.GetMetadata().Name,
-		"role_description": role.GetMetadata().Description,
-	}
-
-	roleTraitOptions := []rs.RoleTraitOption{
-		rs.WithRoleProfile(profile),
-	}
-
-	ret, err := rs.NewRoleResource(
+	roleName := role.GetMetadata().Name
+	return rs.NewRoleResource(
 		role.GetName(),
 		roleResourceType,
-		role.GetMetadata().Name,
-		roleTraitOptions,
+		roleName,
+		[]rs.RoleTraitOption{
+			rs.WithRoleProfile(
+				map[string]interface{}{
+					"role_id":          role.GetMetadata().Revision,
+					"role_name":        roleName,
+					"role_description": role.GetMetadata().Description,
+				},
+			),
+		},
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	return ret, nil
 }
 
 // List returns all the roles from the database as resource objects.
@@ -75,20 +69,15 @@ func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 }
 
 func (r *roleBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
-	var rv []*v2.Entitlement
-	assignmentOptions := []ent.EntitlementOption{
-		ent.WithGrantableTo(userResourceType),
-		ent.WithDisplayName(fmt.Sprintf("%s Role %s", resource.DisplayName, roleMembership)),
-		ent.WithDescription(fmt.Sprintf("Member of %s Teleport role", resource.DisplayName)),
-	}
-
-	rv = append(rv, ent.NewAssignmentEntitlement(
-		resource,
-		roleMembership,
-		assignmentOptions...,
-	))
-
-	return rv, "", nil, nil
+	return []*v2.Entitlement{
+		ent.NewAssignmentEntitlement(
+			resource,
+			roleMembership,
+			ent.WithGrantableTo(userResourceType),
+			ent.WithDisplayName(fmt.Sprintf("%s Role %s", resource.DisplayName, roleMembership)),
+			ent.WithDescription(fmt.Sprintf("Member of %s Teleport role", resource.DisplayName)),
+		),
+	}, "", nil, nil
 }
 
 func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
@@ -104,7 +93,7 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 			continue
 		}
 
-		ur, err := userResource(ctx, resource.Id, userCopy)
+		ur, err := userResource(resource.Id, userCopy)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("error creating user resource for role %s: %w", resource.Id.Resource, err)
 		}
