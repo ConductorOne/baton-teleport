@@ -25,12 +25,12 @@ func TestConfigSchema(t *testing.T) {
 				"missing private key",
 			},
 			{
-				"--teleport-proxy-address 1 --teleport-key 1 --teleport-key-file-path 1",
+				"--teleport-proxy-address 1 --teleport-key 1 --teleport-key-path 1",
 				false,
 				"both private key types",
 			},
 			{
-				"--teleport-proxy-address 1 --teleport-key-file-path 1",
+				"--teleport-proxy-address 1 --teleport-key-path 1",
 				true,
 				"private key path",
 			},

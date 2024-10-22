@@ -82,6 +82,8 @@ func (r *roleBuilder) Entitlements(ctx context.Context, resource *v2.Resource, t
 
 func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	var rv []*v2.Grant
+	// TODO: look into whether we can use client.ListUsers() as it allows filtering, possibly by role
+	// If we can't, we should try caching the list of all users so we're not re-fetching it on every call to Grants()
 	users, err := r.client.GetUsers(ctx)
 	if err != nil {
 		return nil, "", nil, err
@@ -89,10 +91,6 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 
 	for _, user := range users {
 		userCopy := user
-		if user.GetStatus().IsLocked || user.IsBot() {
-			continue
-		}
-
 		ur, err := userResource(resource.Id, userCopy)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("error creating user resource for role %s: %w", resource.Id.Resource, err)

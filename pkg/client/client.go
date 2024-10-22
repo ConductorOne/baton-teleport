@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	teleport "github.com/gravitational/teleport/api/client"
@@ -14,19 +15,34 @@ type TeleportClient struct {
 	ProxyAddress string
 }
 
+var ErrNoKeyProvided = errors.New("no key provided")
+
 const initTimeout = time.Duration(10) * time.Second
 
-func New(ctx context.Context, proxyAddress, keyFile string) (*TeleportClient, error) {
+func New(ctx context.Context, proxyAddress, keyFile, key string) (*TeleportClient, error) {
 	tc := &TeleportClient{
 		ProxyAddress: proxyAddress,
 	}
 	ctx, cancel := context.WithTimeout(ctx, initTimeout)
 	defer cancel()
 
-	creds := teleport.LoadIdentityFile(keyFile)
+	var creds teleport.Credentials
+	switch {
+	case keyFile != "":
+		creds = teleport.LoadIdentityFile(keyFile)
+	case key != "":
+		creds = teleport.LoadIdentityFileFromString(key)
+	default:
+		return nil, ErrNoKeyProvided
+	}
+
+	// TODO: Dial opts are deprecated. We also need to add a default port in proxyAddress if one doesn't exist (to avoid an info message)
 	client, err := teleport.New(ctx, teleport.Config{
 		Addrs:       []string{proxyAddress},
 		Credentials: []teleport.Credentials{creds},
+		// DialOpts: []grpc.DialOption{
+		// 	grpc.WithReturnConnectionError(),
+		// },
 	})
 	if err != nil {
 		return nil, err
@@ -39,6 +55,8 @@ func New(ctx context.Context, proxyAddress, keyFile string) (*TeleportClient, er
 func (t *TeleportClient) SetClient(ctx context.Context, c *teleport.Client) {
 	t.client = c
 }
+
+// TODO: why wrap every client method? We should probably just make the client public
 
 // GetUsers fetch users list.
 func (t *TeleportClient) GetUsers(ctx context.Context) ([]types.User, error) {
