@@ -80,7 +80,7 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 // Users include a UserTrait because they are the 'shape' of a standard user.
 func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
-	users, err := u.client.GetUsers(ctx)
+	users, err := u.client.GetUsers(ctx, false)
 	if err != nil {
 		return nil, "", nil, err
 	}

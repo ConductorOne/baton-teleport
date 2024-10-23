@@ -12,7 +12,7 @@ import (
 )
 
 type TeleportClient struct {
-	client       *teleport.Client
+	*teleport.Client
 	ProxyAddress string
 }
 
@@ -50,24 +50,10 @@ func New(ctx context.Context, proxyAddress, keyFile, key string) (*TeleportClien
 		return nil, err
 	}
 
-	tc.SetClient(ctx, client)
+	tc.Client = client
 	return tc, nil
 }
 
-func (t *TeleportClient) SetClient(ctx context.Context, c *teleport.Client) {
-	t.client = c
-}
-
-// TODO: why wrap every client method? We should probably just make the client public
-
-// GetUsers fetch users list.
-func (t *TeleportClient) GetUsers(ctx context.Context) ([]types.User, error) {
-	return t.client.GetUsers(ctx, false)
-}
-
-// GetRoles fetch roles list.
-func (t *TeleportClient) GetRoles(ctx context.Context) ([]types.Role, error) {
-	return t.client.GetRoles(ctx)
 func hasPort(address string) bool {
 	// remove https and http if it has it
 	address = strings.TrimPrefix(address, "https://")
@@ -75,26 +61,10 @@ func hasPort(address string) bool {
 	return len(strings.Split(address, ":")) == 2
 }
 
-// GetUser gets a user.
-func (t *TeleportClient) GetUser(ctx context.Context, username string) (types.User, error) {
-	return t.client.GetUser(ctx, username, false)
-}
-
-// UpdateUserRole updates a user.
-func (t *TeleportClient) UpdateUserRole(ctx context.Context, user types.User) (types.User, error) {
-	return t.client.UpdateUser(ctx, user.(*types.UserV2))
-}
+// DONE: why wrap every client method? We should probably just make the client public
 
 func (t *TeleportClient) GetNodes(ctx context.Context) (*proto.ListResourcesResponse, error) {
-	return t.client.GetResources(ctx, &proto.ListResourcesRequest{
+	return t.Client.GetResources(ctx, &proto.ListResourcesRequest{
 		ResourceType: types.KindNode,
 	})
-}
-
-func (t *TeleportClient) GetApps(ctx context.Context) ([]types.Application, error) {
-	return t.client.GetApps(ctx)
-}
-
-func (t *TeleportClient) GetDatabases(ctx context.Context) ([]types.Database, error) {
-	return t.client.GetDatabases(ctx)
 }

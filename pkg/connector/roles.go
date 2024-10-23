@@ -84,7 +84,7 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 	var rv []*v2.Grant
 	// TODO: look into whether we can use client.ListUsers() as it allows filtering, possibly by role
 	// If we can't, we should try caching the list of all users so we're not re-fetching it on every call to Grants()
-	users, err := r.client.GetUsers(ctx)
+	users, err := r.client.GetUsers(ctx, false)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -136,14 +136,14 @@ func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		return nil, err
 	}
 
-	user, err := r.client.GetUser(ctx, userName)
+	user, err := r.client.GetUser(ctx, userName, false)
 	if err != nil {
 		return nil, err
 	}
 
 	user.SetLogins(append(user.GetLogins(), userName))
 	user.AddRole(prodRole.GetName())
-	updatedUser, err := r.client.UpdateUserRole(ctx, user)
+	updatedUser, err := r.client.UpdateUser(ctx, user.(*types.UserV2))
 	if err != nil {
 		return nil, fmt.Errorf("teleport-connector: failed to add role: %s", err.Error())
 	}
@@ -174,7 +174,7 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	roleName := entitlement.Resource.Id.Resource
 	userName := principal.Id.Resource
-	user, err := r.client.GetUser(ctx, userName)
+	user, err := r.client.GetUser(ctx, userName, false)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 	}
 
 	user.SetRoles(roleList)
-	updatedUser, err := r.client.UpdateUserRole(ctx, user)
+	updatedUser, err := r.client.UpdateUser(ctx, user.(*types.UserV2))
 	if err != nil {
 		return nil, fmt.Errorf("teleport-connector: failed to revoke role: %s", err.Error())
 	}
