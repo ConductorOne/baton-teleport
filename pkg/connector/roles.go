@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -22,6 +23,8 @@ const roleMembership = "member"
 type roleBuilder struct {
 	resourceType *v2.ResourceType
 	client       *client.TeleportClient
+	sync.RWMutex
+	userCache []types.User
 }
 
 func (r *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
@@ -45,6 +48,21 @@ func getRoleResource(role types.Role) (*v2.Resource, error) {
 			),
 		},
 	)
+}
+
+func (r *roleBuilder) GetUsers(ctx context.Context) ([]types.User, error) {
+	if len(r.userCache) != 0 {
+		return r.userCache, nil
+	}
+
+	users, err := r.client.GetUsers(ctx, false)
+	if err != nil {
+		return []types.User{}, err
+	}
+
+	r.userCache = users
+	users = r.userCache
+	return users, nil
 }
 
 // List returns all the roles from the database as resource objects.
@@ -82,9 +100,15 @@ func (r *roleBuilder) Entitlements(ctx context.Context, resource *v2.Resource, t
 
 func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	var rv []*v2.Grant
-	// TODO: look into whether we can use client.ListUsers() as it allows filtering, possibly by role
+	// DONE: look into whether we can use client.ListUsers() as it allows filtering, possibly by role
 	// If we can't, we should try caching the list of all users so we're not re-fetching it on every call to Grants()
-	users, err := r.client.GetUsers(ctx, false)
+
+	// NOTE: no way to filter by role
+	// users, err := r.client.ListUsers(ctx, usersv1.ListUsersRequest{
+	// 	Filter: &usersv1.UserFilter{},
+	// })
+
+	users, err := r.GetUsers(ctx)
 	if err != nil {
 		return nil, "", nil, err
 	}
