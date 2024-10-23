@@ -25,18 +25,26 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 		accountType = v2.UserTrait_ACCOUNT_TYPE_HUMAN
 		status      v2.UserTrait_Status_Status
 	)
+
+	// DONE: IsBot is false for @teleport-access-approval-bot
+	if user.IsBot() {
+		accountType = v2.UserTrait_ACCOUNT_TYPE_SERVICE
+	}
+
+	if types.IsSystemResource(user) {
+		accountType = v2.UserTrait_ACCOUNT_TYPE_SYSTEM
+	}
+
 	firstName, lastName := resource.SplitFullName(user.GetName())
 	profile := map[string]interface{}{
 		"name":       user.GetName(),
-		"email":      user.GetName(),
 		"user_id":    user.GetMetadata().Revision,
 		"first_name": firstName,
 		"last_name":  lastName,
 	}
 
-	// TODO: IsBot is false for @teleport-access-approval-bot
-	if user.IsBot() {
-		accountType = v2.UserTrait_ACCOUNT_TYPE_SERVICE
+	if accountType == v2.UserTrait_ACCOUNT_TYPE_HUMAN {
+		profile["email"] = user.GetName()
 	}
 
 	switch user.GetStatus().IsLocked {
@@ -48,18 +56,22 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 		status = v2.UserTrait_Status_STATUS_UNSPECIFIED
 	}
 
+	opts := []resource.UserTraitOption{
+		resource.WithUserProfile(profile),
+		resource.WithUserLogin(user.GetName()),
+		resource.WithStatus(status),
+		resource.WithAccountType(accountType),
+	}
+
+	if accountType == v2.UserTrait_ACCOUNT_TYPE_HUMAN {
+		opts = append(opts, resource.WithEmail(user.GetName(), true))
+	}
 	return resource.NewUserResource(
 		user.GetName(),
 		userResourceType,
 		user.GetName(),
-		[]resource.UserTraitOption{
-			resource.WithUserProfile(profile),
-			// TODO: This is not always an email address, at least not for @teleport-access-approval-bot or bots
-			resource.WithEmail(user.GetName(), true),
-			resource.WithUserLogin(user.GetName()),
-			resource.WithStatus(status),
-			resource.WithAccountType(accountType),
-		},
+		// DONE: This is not always an email address, at least not for @teleport-access-approval-bot or bots
+		opts,
 		resource.WithParentResourceID(pId),
 	)
 }
