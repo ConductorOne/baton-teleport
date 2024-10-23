@@ -5,6 +5,8 @@
 *.so
 *.dylib
 *.c1z
+auth.pem
+*.pem
 
 # Test binary, built with `go test -c`
 *.test
