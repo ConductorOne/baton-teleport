@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/conductorone/baton-sdk/pkg/pagination"
 	teleport "github.com/gravitational/teleport/api/client"
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
@@ -63,8 +64,9 @@ func hasPort(address string) bool {
 
 // DONE: why wrap every client method? We should probably just make the client public
 
-func (t *TeleportClient) GetNodes(ctx context.Context) (*proto.ListResourcesResponse, error) {
+func (t *TeleportClient) GetNodes(ctx context.Context, token *pagination.Token) (*proto.ListResourcesResponse, error) {
 	return t.Client.GetResources(ctx, &proto.ListResourcesRequest{
 		ResourceType: types.KindNode,
+		StartKey:     token.Token,
 	})
 }
