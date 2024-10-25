@@ -3,7 +3,6 @@ package connector
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -23,8 +22,7 @@ const roleMembership = "member"
 type roleBuilder struct {
 	resourceType *v2.ResourceType
 	client       *client.TeleportClient
-	sync.RWMutex
-	userCache []types.User
+	userCache    []types.User
 }
 
 func (r *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
@@ -61,7 +59,6 @@ func (r *roleBuilder) GetUsers(ctx context.Context) ([]types.User, error) {
 	}
 
 	r.userCache = users
-	users = r.userCache
 	return users, nil
 }
 
@@ -83,6 +80,8 @@ func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 		rv = append(rv, rr)
 	}
 
+	// clear the cache
+	r.userCache = []types.User{}
 	return rv, "", nil, nil
 }
 

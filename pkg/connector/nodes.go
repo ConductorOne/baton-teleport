@@ -65,7 +65,7 @@ func (n *nodeBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 		id := node.GetNode().GetRevision()
 		mapNodes[id] = Node{
 			Id:        id,
-			Name:      node.GetNode().GetName(),
+			Name:      node.GetNode().GetHostname(),
 			Namespace: node.GetNode().GetNamespace(),
 		}
 	}
@@ -95,6 +95,7 @@ func (r *nodeBuilder) Entitlements(ctx context.Context, resource *v2.Resource, t
 }
 
 // TODO: This should return grants based on who has access to the node resource
+// ISSUE: TLDR: we need a way to associate nodes and roles
 // ISSUE: this is more complicated than initially thought. we need to find what roles
 // a user needs to access any given node, and then return the grants for those resources
 // currently the GetAccessCapabilities should return these values, but is either erroring out
@@ -133,6 +134,7 @@ func (r *nodeBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 }
 
 // TODO: these should either grant/revoke access to a node, or we shouldn't implement them
+// ISSUE: we need a way to associate nodes and roles
 func (r *nodeBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 	userName := principal.Id.Resource
@@ -186,7 +188,8 @@ func (r *nodeBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 	return nil, nil
 }
 
-// TODO: do the revoke too
+// TODO:
+// ISSUE: we need a way to associate nodes and roles
 func (r *nodeBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
 	return nil, nil
 }

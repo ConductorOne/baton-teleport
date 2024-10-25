@@ -63,7 +63,6 @@ func hasPort(address string) bool {
 }
 
 // DONE: why wrap every client method? We should probably just make the client public
-
 func (t *TeleportClient) GetNodes(ctx context.Context, token *pagination.Token) (*proto.ListResourcesResponse, error) {
 	return t.Client.GetResources(ctx, &proto.ListResourcesRequest{
 		ResourceType: types.KindNode,
