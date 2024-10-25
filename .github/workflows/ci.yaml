@@ -69,7 +69,7 @@ jobs:
         uses: teleport-actions/auth@v2
         with:
           proxy: ${{ env.TELEPORT_PROXY }}
-          token: github-actions-cd
+          token: baton
           anonymous-telemetry: 1
       - name: Check tsh status
         run: tsh status
