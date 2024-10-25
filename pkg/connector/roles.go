@@ -99,14 +99,6 @@ func (r *roleBuilder) Entitlements(ctx context.Context, resource *v2.Resource, t
 
 func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	var rv []*v2.Grant
-	// DONE: look into whether we can use client.ListUsers() as it allows filtering, possibly by role
-	// If we can't, we should try caching the list of all users so we're not re-fetching it on every call to Grants()
-
-	// NOTE: no way to filter by role
-	// users, err := r.client.ListUsers(ctx, usersv1.ListUsersRequest{
-	// 	Filter: &usersv1.UserFilter{},
-	// })
-
 	users, err := r.GetUsers(ctx)
 	if err != nil {
 		return nil, "", nil, err

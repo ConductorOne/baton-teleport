@@ -22,7 +22,6 @@ var ErrNoKeyProvided = errors.New("no key provided")
 const initTimeout = time.Duration(10) * time.Second
 
 func New(ctx context.Context, proxyAddress, keyFile, key string) (*TeleportClient, error) {
-	// DONE: Dial opts are deprecated. We also need to add a default port in proxyAddress if one doesn't exist (to avoid an info message)
 	if !hasPort(proxyAddress) {
 		proxyAddress += ":443"
 	}

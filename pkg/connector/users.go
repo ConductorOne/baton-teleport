@@ -26,7 +26,6 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 		status      v2.UserTrait_Status_Status
 	)
 
-	// DONE: IsBot is false for @teleport-access-approval-bot
 	if user.IsBot() {
 		accountType = v2.UserTrait_ACCOUNT_TYPE_SERVICE
 	}
@@ -70,7 +69,6 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 		user.GetName(),
 		userResourceType,
 		user.GetName(),
-		// DONE: This is not always an email address, at least not for @teleport-access-approval-bot or bots
 		opts,
 		resource.WithParentResourceID(pId),
 	)

@@ -52,7 +52,6 @@ func getNodeResource(node *Node) (*v2.Resource, error) {
 // Nodes include a NodeTrait because they are the 'shape' of a standard node.
 func (n *nodeBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
-	// DONE: client.GetNodes calls GetResources, which is paginated. we need to handle pagination here
 	nodes, err := n.client.GetNodes(ctx, token)
 	if err != nil {
 		return nil, "", nil, err
