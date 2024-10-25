@@ -52,7 +52,9 @@ jobs:
       CONNECTOR_ENTITLEMENT: 'role:reviewer:member'
       CONNECTOR_PRINCIPAL: 'miguel_chavez_m@hotmail.com'
       CONNECTOR_PRINCIPAL_TYPE: 'user'
-      TELEPORT_PROXY: ${{ secrets.PROXY }}
+      BATON_TELEPORT_KEY_PATH: auth.pem
+      BATON_TELEPORT_PROXY_ADDRESS: ${{ secrets.PROXY }}
+
     steps:
       - name: Install Go
         uses: actions/setup-go@v4
@@ -68,7 +70,7 @@ jobs:
         id: auth
         uses: teleport-actions/auth@v2
         with:
-          proxy: ${{ env.TELEPORT_PROXY }}
+          proxy: ${{ secrets.PROXY }}
           token: baton
           anonymous-telemetry: 1
       - name: Check tsh status
@@ -80,7 +82,7 @@ jobs:
       - name: Build baton-teleport
         run: go build ./cmd/baton-teleport
       - name: Run baton-teleport
-        run: ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --teleport-key-file auth.pem
+        run: ./baton-teleport 
       - name: Install baton
         run: ./scripts/get-baton.sh && mv baton /usr/local/bin
       - name: Get baton resources
@@ -88,25 +90,25 @@ jobs:
       - name: Check for grant before revoking
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
         run: |
-          ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --teleport-key-file auth.pem
+          ./baton-teleport
           baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq -e ".grants | any(.principal.id.resource ==\"${{ env.CONNECTOR_PRINCIPAL }}\")"
       - name: Revoke grants
         if: env.CONNECTOR_GRANT != ''
         run: |
-          ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --teleport-key-file auth.pem 
-          ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --teleport-key-file auth.pem --revoke-grant ${{ env.CONNECTOR_GRANT }}
+          ./baton-teleport
+          ./baton-teleport --revoke-grant ${{ env.CONNECTOR_GRANT }}
       - name: Check grant was revoked
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
         run: |
-           ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --teleport-key-file auth.pem
+           ./baton-teleport
            baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq -e ".grants | any(.principal.id.resource !=\"${{ env.CONNECTOR_PRINCIPAL }}\")"
       - name: Grant entitlement
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != '' && env.CONNECTOR_PRINCIPAL_TYPE != ''
         run: | 
-          ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --teleport-key-file auth.pem
-          ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --teleport-key-file auth.pem --grant-entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --grant-principal ${{ env.CONNECTOR_PRINCIPAL }} --grant-principal-type ${{ env.CONNECTOR_PRINCIPAL_TYPE }}
+          ./baton-teleport
+          ./baton-teleport --grant-entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --grant-principal ${{ env.CONNECTOR_PRINCIPAL }} --grant-principal-type ${{ env.CONNECTOR_PRINCIPAL_TYPE }}
       - name: Check grant was re-granted
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
         run: |
-          ./baton-teleport --teleport-proxy-address ${{ env.TELEPORT_PROXY }} --teleport-key-file auth.pem
+          ./baton-teleport
           baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq -e ".grants | any(.principal.id.resource ==\"${{ env.CONNECTOR_PRINCIPAL }}\")"
