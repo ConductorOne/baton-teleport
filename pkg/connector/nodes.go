@@ -99,7 +99,7 @@ func (r *nodeBuilder) Entitlements(ctx context.Context, resource *v2.Resource, t
 // ISSUE: this is more complicated than initially thought. we need to find what roles
 // a user needs to access any given node, and then return the grants for those resources
 // currently the GetAccessCapabilities should return these values, but is either erroring out
-// or returning and empty list, we need to figure out a way to make that function run properly
+// or returning and empty list, we need to figure out a way to make that function run properly.
 func (r *nodeBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	// nodes, err := r.client.ListResources(ctx, proto.ListResourcesRequest{
 	// 	ResourceType: types.KindNode,
@@ -134,7 +134,7 @@ func (r *nodeBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 }
 
 // TODO: these should either grant/revoke access to a node, or we shouldn't implement them
-// ISSUE: we need a way to associate nodes and roles
+// ISSUE: we need a way to associate nodes and roles.
 func (r *nodeBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 	userName := principal.Id.Resource
@@ -189,7 +189,7 @@ func (r *nodeBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 }
 
 // TODO:
-// ISSUE: we need a way to associate nodes and roles
+// ISSUE: we need a way to associate nodes and roles.
 func (r *nodeBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
 	return nil, nil
 }
