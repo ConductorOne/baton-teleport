@@ -48,9 +48,9 @@ jobs:
     env:
       BATON_LOG_LEVEL: debug
       # The following parameters are passed to grant/revoke commands
-      CONNECTOR_GRANT: 'role:reviewer:member:user:miguel_chavez_m@hotmail.com'
+      CONNECTOR_GRANT: 'role:reviewer:member:user:alejandro.bernal@conductorone.com'
       CONNECTOR_ENTITLEMENT: 'role:reviewer:member'
-      CONNECTOR_PRINCIPAL: 'miguel_chavez_m@hotmail.com'
+      CONNECTOR_PRINCIPAL: 'alejandro.bernal@conductorone.com'
       CONNECTOR_PRINCIPAL_TYPE: 'user'
       BATON_TELEPORT_KEY_PATH: auth.pem
       BATON_TELEPORT_PROXY_ADDRESS: ${{ secrets.PROXY }}
