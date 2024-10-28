@@ -1005,7 +1005,9 @@ func (c *SPIFFERoleCondition) CheckAndSetDefaults() error {
 	return nil
 }
 
-// CheckAndSetDefaults checks validity of all parameters and sets defaults
+// CheckAndSetDefaults checks validity of all parameters and sets defaults.
+// Must be kept in sync with
+// `web/packages/teleport/src/Roles/RoleEditor/withDefaults.ts`.
 func (r *RoleV6) CheckAndSetDefaults() error {
 	r.setStaticFields()
 	if err := r.Metadata.CheckAndSetDefaults(); err != nil {
@@ -1852,6 +1854,8 @@ func (r *RoleV6) GetLabelMatchers(rct RoleConditionType, kind string) (LabelMatc
 	case KindDatabaseService:
 		return LabelMatchers{cond.DatabaseServiceLabels, cond.DatabaseServiceLabelsExpression}, nil
 	case KindWindowsDesktop:
+		return LabelMatchers{cond.WindowsDesktopLabels, cond.WindowsDesktopLabelsExpression}, nil
+	case KindDynamicWindowsDesktop:
 		return LabelMatchers{cond.WindowsDesktopLabels, cond.WindowsDesktopLabelsExpression}, nil
 	case KindWindowsDesktopService:
 		return LabelMatchers{cond.WindowsDesktopLabels, cond.WindowsDesktopLabelsExpression}, nil
