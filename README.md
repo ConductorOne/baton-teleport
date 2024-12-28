@@ -14,11 +14,11 @@ Teleport provides on-demand, least-privileged access to your infrastructure, on 
 - An identity file named `auth.pem` It can be added, using tctl admin tool.
 - Teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
 - Application Scopes: 
-  - users
-  - roles
-  - nodes
-  - apps
-  - databases
+  - user
+  - role
+  - node
+  - app
+  - db
   - grant resources
   - revoke resources
 
