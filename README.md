@@ -3,9 +3,18 @@
 
 Check out [Baton](https://github.com/conductorone/baton) to learn more about the project in general.
 
-# Getting Started
-Free, 14-day trial of Teleport Enterprise.
-Teleport provides on-demand, least-privileged access to your infrastructure, on a foundation of cryptographic identity and zero trust, with built-in identity and policy governance.
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+   * [Brew](#brew)
+   * [Docker](#docker)
+   * [Source](#source)
+- [Quick Setup ](#quick-setup)
+- [On-Prem Setup ](#on-prem-setup)
+   * [Run as a service](#run-as-a-service)
+- [Local Teleport Instance Setup](#local-teleport-instance-setup)
+   * [Alternatively, You can start teleport by generating an invitation token ](#alternatively-you-can-start-teleport-by-generating-an-invitation-token)
+- [Contributing, Support, and Issues](#contributing-support-and-issues)
+- [`baton-teleport` Command Line Usage](#baton-teleport-command-line-usage)
 
 ## Prerequisites
 - A running Teleport cluster. For details on how to set this up, see the [Getting Started guide](https://goteleport.com/docs/).
@@ -14,15 +23,15 @@ Teleport provides on-demand, least-privileged access to your infrastructure, on 
 - An identity file named `auth.pem` It can be added, using tctl admin tool.
 - Teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
 - Application Scopes: 
-  - users
-  - roles
-  - nodes
-  - apps
-  - databases
-  - grant resources
-  - revoke resources
+  - user
+  - role
+  - node
+  - app
+  - db
 
-## brew
+# Installation
+
+## Brew
 
 ```
 brew install conductorone/baton/baton conductorone/baton/baton-teleport
@@ -30,14 +39,14 @@ baton-teleport
 baton resources
 ```
 
-## docker
+## Docker
 
 ```
 docker run --rm -v $(pwd):/out -e BATON_PROXYADDR=clientProxy ghcr.io/conductorone/baton-teleport:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
-## source
+## Source
 
 ```
 go install github.com/conductorone/baton/cmd/baton@main
@@ -47,18 +56,74 @@ BATON_PROXYADDR=clientProxy baton-teleport
 baton resources
 ```
 
-# Data Model
+# Quick Setup 
+This is the fastest way to get started with `baton-teleport`. However, authentication is temporary and will expire after a short period.
+Ideal for quick testing of the connector or for use in short-lived environments.
 
-`baton-teleport` pulls down information about the following teleport resources:
-- Users
-- Roles
-- Nodes
-- Apps
-- Databases
+1. Login
+```bash
+tsh login --proxy=<cluster_name> --user=<email_account>
+```
 
-# Running a teleport instance
+2. Create auth.pem file
+```bash
+tctl auth sign --proxy=<cluster_name> --user=<email_account> -o auth.pem 
+```
 
-#### Replace `<email_account>` and `<cluster_name>` with your cluster credentials, Also add the port number(:443) to your cluster_name.
+3. Run 
+```bash
+baton-teleport --teleport-proxy-address=<cluster_name>:443 --teleport-key-path=auth.pem
+
+# Example
+baton-teleport --teleport-proxy-address=conductorone.teleport.sh:443 --teleport-key-path=auth.pem
+```
+
+# On-Prem Setup 
+This setup's token will not expire, but requires more steps.  
+https://goteleport.com/docs/enroll-resources/machine-id/deployment/linux/
+
+1. Create a bot
+```bash
+tctl bots add example
+```
+
+2. Create the `/etc/tbot.yaml` file
+- replace `<your example.teleport.sh:443 >` with your teleport server address
+- replace `<your token>` with the token you got from the bot creation
+
+```yaml
+version: v2
+proxy_server: <your example.teleport.sh:443 >
+onboarding:
+  join_method: token
+  token: <your token>
+storage:
+  type: directory
+  path: /var/lib/teleport/bot
+outputs: 
+  - type: identity
+    destination:
+      type: directory
+      path: /opt/machine-id
+```
+
+3. Add roles to the bot
+https://goteleport.com/docs/reference/access-controls/roles#preset-roles
+
+```bash
+tctl bots update example --add-roles "access,auditor,editor"
+```
+
+4. Run the tbot
+```bash
+tbot -c /etc/tbot.yaml start
+```
+## Run as a service
+You can also set the tbot to run as a service by following the instructions here:  
+https://goteleport.com/docs/enroll-resources/machine-id/deployment/linux/#create-a-systemd-service
+
+# Local Teleport Instance Setup
+Replace `<email_account>` and `<cluster_name>` with your cluster credentials, Also add the port number(:443) to your cluster_name.
 
 1. Install Teleport
 ```
@@ -105,7 +170,7 @@ sudo teleport start --config="/etc/teleport.yaml"
 TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email_account> --out=auth.pem
 ```
 
-### Alternatively, You can start teleport by generating an invitation token 
+## Alternatively, You can start teleport by generating an invitation token 
 1. Generate an invitation token with roles for the host. 
 ```
 TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
@@ -155,7 +220,7 @@ Flags:
       --log-level string                The log level: debug, info, warn, error ($BATON_LOG_LEVEL) (default "info")
   -p, --provisioning                    This must be set in order for provisioning actions to be enabled ($BATON_PROVISIONING)
       --skip-full-sync                  This must be set to skip a full sync ($BATON_SKIP_FULL_SYNC)
-      --teleport-key-file string        required: Path to the teleport file generated by using the tctl admin tool. Example: "auth.pem". ($BATON_TELEPORT_KEY_FILE)
+      --teleport-key-path string        required: Path to the teleport file generated by using the tctl admin tool. Example: "auth.pem". ($BATON_TELEPORT_KEY_PATH)
       --teleport-proxy-address string   required: The fully-qualified teleport proxy service to connect with. Example: "baton.teleport.sh:443". ($BATON_TELEPORT_PROXY_ADDRESS)
       --ticketing                       This must be set to enable ticketing support ($BATON_TICKETING)
   -v, --version                         version for baton-teleport
