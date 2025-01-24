@@ -1,0 +1,34 @@
+# This is a basic workflow to help you get started.
+# It will take the following action whenever a push is made to the "main" branch.
+on:
+  push:
+    branches:
+    - auth
+    - main
+jobs:
+  demo:
+    permissions:
+      # The "id-token: write" permission is required or Machine ID will not be
+      # able to authenticate with the cluster.
+      id-token: write
+      contents: read
+    # The name of the workflow, and the Linux distro to be used to perform the
+    # required steps.
+    name: tbot auth
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Fetch Teleport binaries
+      uses: teleport-actions/setup@v1
+      with:
+        version: 16.4.6
+
+    - name: Execute Machine ID
+      env:
+        # TELEPORT_ANONYMOUS_TELEMETRY enables the submission of anonymous
+        # usage telemetry. This helps us shape the future development of
+        # tbot. You can disable this by omitting this.
+        TELEPORT_ANONYMOUS_TELEMETRY: 1
+      run: tbot start -c ./tbot.yaml --oneshot

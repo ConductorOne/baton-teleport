@@ -1,0 +1,10 @@
+version: v2
+proxy_server: conductorone.teleport.sh:443
+onboarding:
+  join_method: github
+  token: example-token
+oneshot: true
+storage:
+  type: memory
+# outputs will be filled in during the completion of an access guide.
+outputs: []

@@ -87,6 +87,7 @@ jobs:
         run: ./scripts/get-baton.sh && mv baton /usr/local/bin
       - name: Get baton resources
         run: baton resources
+
       - name: Grant entitlement
         if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != '' && env.CONNECTOR_PRINCIPAL_TYPE != ''
         run: | 
