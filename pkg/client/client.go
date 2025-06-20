@@ -62,7 +62,7 @@ func hasPort(address string) bool {
 }
 
 func (t *TeleportClient) GetNodes(ctx context.Context, token *pagination.Token) (*proto.ListResourcesResponse, error) {
-	return t.Client.GetResources(ctx, &proto.ListResourcesRequest{
+	return t.GetResources(ctx, &proto.ListResourcesRequest{
 		ResourceType: types.KindNode,
 		StartKey:     token.Token,
 	})
