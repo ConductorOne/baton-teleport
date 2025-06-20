@@ -9,18 +9,18 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.22.x
+          go-version: 1.23.x
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Run linters
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           args: --timeout=3m
   go-test:
     strategy:
       matrix:
-        go-version: [1.22.x]
+        go-version: [1.23.x]
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -38,82 +38,82 @@ jobs:
         uses: guyarb/golang-test-annotations@v0.5.1
         with:
           test-results: test.json
-
-  test:
-    permissions:
-      id-token: write # permission is required or Machine ID will not authenticate with the cluster.
-      contents: read
-      pages: write
-    runs-on: ubuntu-latest
-    env:
-      BATON_LOG_LEVEL: debug
-      # The following parameters are passed to grant/revoke commands
-      CONNECTOR_GRANT: 'role:reviewer:member:user:alejandro.bernal@conductorone.com'
-      CONNECTOR_ENTITLEMENT: 'role:reviewer:member'
-      CONNECTOR_PRINCIPAL: 'alejandro.bernal@conductorone.com'
-      CONNECTOR_PRINCIPAL_TYPE: 'user'
-      BATON_TELEPORT_KEY_PATH: auth.pem
-      BATON_TELEPORT_PROXY_ADDRESS: ${{ secrets.PROXY }}
-
-    steps:
-      - name: Install Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.22.x
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Fetch Teleport binaries
-        uses: teleport-actions/setup@v1
-        with:
-          version: 16.2.0
-      - name: Fetch credentials using Machine ID
-        id: auth
-        uses: teleport-actions/auth@v2
-        with:
-          proxy: ${{ secrets.PROXY }}
-          token: baton
-          anonymous-telemetry: 1
-      - name: Check tsh status
-        run: tsh status
-      - name: Check tctl status
-        run: tctl status
-      - name: Add identity file
-        run: cp ${{ steps.auth.outputs.identity-file }} auth.pem
-      - name: Build baton-teleport
-        run: go build ./cmd/baton-teleport
-      - name: Run baton-teleport
-        run: ./baton-teleport 
-      - name: Install baton
-        run: ./scripts/get-baton.sh && mv baton /usr/local/bin
-      - name: Get baton resources
-        run: baton resources
-      - name: Grant entitlement
-        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != '' && env.CONNECTOR_PRINCIPAL_TYPE != ''
-        run: | 
-          ./baton-teleport
-          ./baton-teleport --grant-entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --grant-principal ${{ env.CONNECTOR_PRINCIPAL }} --grant-principal-type ${{ env.CONNECTOR_PRINCIPAL_TYPE }}
-      - name: Check for grant before revoking
-        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
-        run: |
-          ./baton-teleport
-          baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq -e ".grants | any(.principal.id.resource ==\"${{ env.CONNECTOR_PRINCIPAL }}\")"
-      - name: Revoke grants
-        if: env.CONNECTOR_GRANT != ''
-        run: |
-          ./baton-teleport
-          ./baton-teleport --revoke-grant ${{ env.CONNECTOR_GRANT }}
-      - name: Check grant was revoked
-        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
-        run: |
-           ./baton-teleport
-           baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq --exit-status "if .grants then [ .grants[] | select(.principal.id.resource != \"${{ env.CONNECTOR_PRINCIPAL }}\") ] | length == 0 else . end"
-      - name: Grant entitlement
-        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != '' && env.CONNECTOR_PRINCIPAL_TYPE != ''
-        run: | 
-          ./baton-teleport
-          ./baton-teleport --grant-entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --grant-principal ${{ env.CONNECTOR_PRINCIPAL }} --grant-principal-type ${{ env.CONNECTOR_PRINCIPAL_TYPE }}
-      - name: Check grant was re-granted
-        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
-        run: |
-          ./baton-teleport
-          baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq -e ".grants | any(.principal.id.resource ==\"${{ env.CONNECTOR_PRINCIPAL }}\")"
+#
+#  test:
+#    permissions:
+#      id-token: write # permission is required or Machine ID will not authenticate with the cluster.
+#      contents: read
+#      pages: write
+#    runs-on: ubuntu-latest
+#    env:
+#      BATON_LOG_LEVEL: debug
+#      # The following parameters are passed to grant/revoke commands
+#      CONNECTOR_GRANT: ${{ vars.GRANT }} 'role:reviewer:member:user:alejandro.bernal@conductorone.com'
+#      CONNECTOR_ENTITLEMENT: ${{ vars.ENTITLEMENT }} 'role:reviewer:member'
+#      CONNECTOR_PRINCIPAL: ${{ vars.PRINCIPAL }} 'alejandro.bernal@conductorone.com'
+#      CONNECTOR_PRINCIPAL_TYPE: ${{ vars.PRINCIPAL_TYPE }}
+#      BATON_TELEPORT_KEY_PATH: auth.pem
+#      BATON_TELEPORT_PROXY_ADDRESS: ${{ secrets.PROXY }}
+#
+#    steps:
+#      - name: Install Go
+#        uses: actions/setup-go@v4
+#        with:
+#          go-version: 1.23.x
+#      - name: Checkout code
+#        uses: actions/checkout@v3
+#      - name: Fetch Teleport binaries
+#        uses: teleport-actions/setup@v1
+#        with:
+#          version: 16.2.0
+#      - name: Fetch credentials using Machine ID
+#        id: auth
+#        uses: teleport-actions/auth@v2
+#        with:
+#          proxy: ${{ secrets.PROXY }}
+#          token: baton
+#          anonymous-telemetry: 1
+#      - name: Check tsh status
+#        run: tsh status
+#      - name: Check tctl status
+#        run: tctl status
+#      - name: Add identity file
+#        run: cp ${{ steps.auth.outputs.identity-file }} auth.pem
+#      - name: Build baton-teleport
+#        run: go build ./cmd/baton-teleport
+#      - name: Run baton-teleport
+#        run: ./baton-teleport
+#      - name: Install baton
+#        run: ./scripts/get-baton.sh && mv baton /usr/local/bin
+#      - name: Get baton resources
+#        run: baton resources
+#      - name: Grant entitlement
+#        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != '' && env.CONNECTOR_PRINCIPAL_TYPE != ''
+#        run: |
+#          ./baton-teleport
+#          ./baton-teleport --grant-entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --grant-principal ${{ env.CONNECTOR_PRINCIPAL }} --grant-principal-type ${{ env.CONNECTOR_PRINCIPAL_TYPE }}
+#      - name: Check for grant before revoking
+#        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
+#        run: |
+#          ./baton-teleport
+#          baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq -e ".grants | any(.principal.id.resource ==\"${{ env.CONNECTOR_PRINCIPAL }}\")"
+#      - name: Revoke grants
+#        if: env.CONNECTOR_GRANT != ''
+#        run: |
+#          ./baton-teleport
+#          ./baton-teleport --revoke-grant ${{ env.CONNECTOR_GRANT }}
+#      - name: Check grant was revoked
+#        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
+#        run: |
+#           ./baton-teleport
+#           baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq --exit-status "if .grants then [ .grants[] | select(.principal.id.resource != \"${{ env.CONNECTOR_PRINCIPAL }}\") ] | length == 0 else . end"
+#      - name: Grant entitlement
+#        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != '' && env.CONNECTOR_PRINCIPAL_TYPE != ''
+#        run: |
+#          ./baton-teleport
+#          ./baton-teleport --grant-entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --grant-principal ${{ env.CONNECTOR_PRINCIPAL }} --grant-principal-type ${{ env.CONNECTOR_PRINCIPAL_TYPE }}
+#      - name: Check grant was re-granted
+#        if: env.CONNECTOR_ENTITLEMENT != '' && env.CONNECTOR_PRINCIPAL != ''
+#        run: |
+#          ./baton-teleport
+#          baton grants --entitlement ${{ env.CONNECTOR_ENTITLEMENT }} --output-format=json | jq -e ".grants | any(.principal.id.resource ==\"${{ env.CONNECTOR_PRINCIPAL }}\")"

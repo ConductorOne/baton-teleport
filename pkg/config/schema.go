@@ -16,15 +16,21 @@ var (
 		field.WithRequired(true),
 		field.WithDescription("The fully-qualified teleport proxy service to connect with. Example: \"baton.teleport.sh:443\"."),
 	)
-	ConfigurationFields = []field.SchemaField{
-		ProxyAddressField,
-		TeleportKeyFilePathField,
-		TeleportKeyField,
+
+	fieldRelationships = []field.SchemaFieldRelationship{
+		field.FieldsMutuallyExclusive(TeleportKeyFilePathField, TeleportKeyField),
+		field.FieldsAtLeastOneUsed(TeleportKeyFilePathField, TeleportKeyField),
 	}
 
 	ConfigurationSchema = field.NewConfiguration(
-		ConfigurationFields,
-		field.FieldsMutuallyExclusive(TeleportKeyFilePathField, TeleportKeyField),
-		field.FieldsAtLeastOneUsed(TeleportKeyFilePathField, TeleportKeyField),
+		[]field.SchemaField{
+			ProxyAddressField,
+			TeleportKeyFilePathField,
+			TeleportKeyField,
+		},
+		field.WithConstraints(fieldRelationships...),
+		field.WithConnectorDisplayName("Teleport"),
+		field.WithHelpUrl("/docs/baton/teleport"),
+		field.WithIconUrl("/static/app-icons/teleport.svg"),
 	)
 )
