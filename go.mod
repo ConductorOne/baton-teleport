@@ -5,7 +5,7 @@ go 1.23.4
 toolchain go1.24.2
 
 require (
-	github.com/conductorone/baton-sdk v0.3.15
+	github.com/conductorone/baton-sdk v0.3.16
 	github.com/gravitational/teleport/api v0.0.0-20241022213454-d82ee8440cbc
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/spf13/viper v1.19.0
