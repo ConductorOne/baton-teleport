@@ -28,6 +28,17 @@ Check out [Baton](https://github.com/conductorone/baton) to learn more about the
   - node
   - app
   - db
+  - 
+## Connector capabilities
+
+- Sync Users, roles, nodes, apps and databases.
+
+- Supports entitlements provisioning between users and roles
+
+- Support account provisioning: 
+  IMPORTANT NOTE: Due to Teleport's security rules, it is not possible to auto-generate and assign passwords to newly created users. 
+  Therefore, when a new user is created from ConductorOne, a password reset link (associated with a token) will be sent to a vault. 
+  This allows the user to configure the password for their new account.
 
 # Installation
 
