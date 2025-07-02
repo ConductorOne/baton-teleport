@@ -55,7 +55,7 @@ func (d *Connector) Metadata(_ context.Context) (*v2.ConnectorMetadata, error) {
 						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
 					},
 					Placeholder: "access",
-					Order:       3,
+					Order:       2,
 				},
 			},
 		},
