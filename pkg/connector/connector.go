@@ -31,11 +31,34 @@ func (d *Connector) Asset(ctx context.Context, asset *v2.AssetRef) (string, io.R
 	return "", nil, nil
 }
 
-// Metadata returns metadata about the connector.
-func (d *Connector) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
+func (d *Connector) Metadata(_ context.Context) (*v2.ConnectorMetadata, error) {
 	return &v2.ConnectorMetadata{
-		DisplayName: "Baton Teleport Connector",
-		Description: "Connector syncing users, and roles from Teleport.",
+		DisplayName: "Teleport Connector",
+		Description: "Connector to sync and provision users into Teleport.",
+		AccountCreationSchema: &v2.ConnectorAccountCreationSchema{
+			FieldMap: map[string]*v2.ConnectorAccountCreationSchema_Field{
+				"name": {
+					DisplayName: "Username",
+					Required:    true,
+					Description: "The unique username of the user in Teleport.",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+					Placeholder: "name",
+					Order:       1,
+				},
+				"role": {
+					DisplayName: "Role",
+					Required:    false,
+					Description: "The role to assign to the user. Defaults to 'access' if not provided.",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+					Placeholder: "access",
+					Order:       3,
+				},
+			},
+		},
 	}, nil
 }
 
