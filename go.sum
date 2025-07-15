@@ -691,8 +691,8 @@ github.com/cncf/xds/go v0.0.0-20211011173535-cb28da3451f1/go.mod h1:eXthEFrGJvWH
 github.com/cncf/xds/go v0.0.0-20220314180256-7f1daf1720fc/go.mod h1:eXthEFrGJvWHgFFCl3hGmgk+/aYT6PnTQLykKQRLhEs=
 github.com/cncf/xds/go v0.0.0-20230105202645-06c439db220b/go.mod h1:eXthEFrGJvWHgFFCl3hGmgk+/aYT6PnTQLykKQRLhEs=
 github.com/cncf/xds/go v0.0.0-20230607035331-e9ce68804cb4/go.mod h1:eXthEFrGJvWHgFFCl3hGmgk+/aYT6PnTQLykKQRLhEs=
-github.com/conductorone/baton-sdk v0.3.15 h1:gc84sILYEm9Z2M7EvAOsPYvIxhBZqkfoLOQf3isIPKo=
-github.com/conductorone/baton-sdk v0.3.15/go.mod h1:lWZHgu025Rsgs5jvBrhilGti0zWF2+YfaFY/bWOS/g0=
+github.com/conductorone/baton-sdk v0.3.19 h1:d66IF4/qjmHKzL1Vt7yLOGE8gi2BbeoA7SodkUFgUDo=
+github.com/conductorone/baton-sdk v0.3.19/go.mod h1:lWZHgu025Rsgs5jvBrhilGti0zWF2+YfaFY/bWOS/g0=
 github.com/conductorone/dpop v0.2.3 h1:s91U3845GHQ6P6FWrdNr2SEOy1ES/jcFs1JtKSl2S+o=
 github.com/conductorone/dpop v0.2.3/go.mod h1:gyo8TtzB9SCFCsjsICH4IaLZ7y64CcrDXMOPBwfq/3s=
 github.com/conductorone/dpop/integrations/dpop_grpc v0.2.3 h1:kLMCNIh0Mo2vbvvkCmJ3ixsPbXEJ6HPcW53Ku9yje3s=
