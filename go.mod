@@ -5,7 +5,7 @@ go 1.23.4
 toolchain go1.24.2
 
 require (
-	github.com/conductorone/baton-sdk v0.3.15
+	github.com/conductorone/baton-sdk v0.3.51
 	github.com/gravitational/teleport/api v0.0.0-20241022213454-d82ee8440cbc
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/spf13/viper v1.19.0
@@ -71,7 +71,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jellydator/ttlcache/v3 v3.3.0 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
-	github.com/klauspost/compress v1.17.11 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20240909124753-873cd0166683 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
 	github.com/mattermost/xml-roundtrip-validator v0.1.0 // indirect
