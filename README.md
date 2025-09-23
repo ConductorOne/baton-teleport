@@ -129,21 +129,6 @@ tctl bots update example --add-roles "access,auditor,editor"
 ```bash
 tbot -c /etc/tbot.yaml start
 ```
-
-5. Run the Baton Teleport Connector
-   * Replace <your-teleport-server> with your Teleport proxy address (e.g. example.teleport.sh:443).  
-   * Replace <your-client-id>@<your-instance> with the Client ID provided in the Baton dashboard. 
-   * Replace <your-client-secret> with the secret token from the Baton dashboard. 
-   * Replace <path-to-identity> with the same path you configured under outputs.destination.path in /etc/tbot.yaml, followed by /identity.
-   ```
-   baton-teleport \
-   --teleport-proxy-address <your-teleport-server>.teleport.sh:443 \
-   --teleport-key-path <path-to-identity>/identity \
-   --client-id <your-client-id> \
-   --client-secret <your-client-secret> \
-   --provisioning
-   ```
-
 ## Run as a service
 You can also set the tbot to run as a service by following the instructions here:  
 https://goteleport.com/docs/enroll-resources/machine-id/deployment/linux/#create-a-systemd-service
