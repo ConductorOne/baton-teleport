@@ -1,4 +1,6 @@
 version: "2"
+run:
+  modules-download-mode: readonly
 linters:
   default: none
   enable:
@@ -68,6 +70,7 @@ linters:
           arguments:
             - fmt.Printf
             - fmt.Println
+            - fmt.Fprint
             - fmt.Fprintf
             - fmt.Fprintln
             - os.Stderr.Sync
@@ -94,6 +97,12 @@ linters:
       - linters:
           - godot
         source: (TODO)
+      - path: (.+)\.go$
+        text: third_party$
+      - path: (.+)\.go$
+        text: builtin$
+      - path: (.+)\.go$
+        text: examples$
     paths:
       - third_party$
       - builtin$
@@ -101,8 +110,6 @@ linters:
 issues:
   max-same-issues: 50
 formatters:
-  enable:
-    - goimports
   exclusions:
     generated: lax
     paths:
