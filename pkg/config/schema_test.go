@@ -10,7 +10,7 @@ import (
 func TestConfigSchema(t *testing.T) {
 	test.ExerciseTestCasesFromExpressions(
 		t,
-		ConfigurationSchema,
+		Config,
 		nil,
 		ustrings.ParseFlags,
 		[]test.TestCaseFromExpression{
