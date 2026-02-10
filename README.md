@@ -1,4 +1,4 @@
-# `baton-teleport` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-teleport.svg)](https://pkg.go.dev/github.com/conductorone/baton-teleport) ![main ci](https://github.com/conductorone/baton-teleport/actions/workflows/main.yaml/badge.svg)
+# `baton-teleport` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-teleport.svg)](https://pkg.go.dev/github.com/conductorone/baton-teleport) ![ci](https://github.com/conductorone/baton-teleport/actions/workflows/ci.yaml/badge.svg)
 `baton-teleport` is a connector for teleport built using the [Baton SDK](https://github.com/conductorone/baton-sdk). It communicates with the teleport API to sync data about users, roles, nodes, apps, and databases.
 
 Check out [Baton](https://github.com/conductorone/baton) to learn more about the project in general.
@@ -22,22 +22,22 @@ Check out [Baton](https://github.com/conductorone/baton) to learn more about the
   See [Installation](https://goteleport.com/docs/installation/) for details.
 - An identity file named `auth.pem` It can be added, using tctl admin tool.
 - Teleport `trial account` sign up for a free teleport Support trial  [developer site](https://goteleport.com/signup/)
-- Application Scopes: 
+- Application Scopes:
   - user
   - role
   - node
   - app
   - db
-  - 
+  -
 ## Connector capabilities
 
 - Sync Users, roles, nodes, apps and databases.
 
 - Supports entitlements provisioning between users and roles
 
-- Support account provisioning: 
-  IMPORTANT NOTE: Due to Teleport's security rules, it is not possible to auto-generate and assign passwords to newly created users. 
-  Therefore, when a new user is created from ConductorOne, a password reset link (associated with a token) will be sent to a vault. 
+- Support account provisioning:
+  IMPORTANT NOTE: Due to Teleport's security rules, it is not possible to auto-generate and assign passwords to newly created users.
+  Therefore, when a new user is created from ConductorOne, a password reset link (associated with a token) will be sent to a vault.
   This allows the user to configure the password for their new account.
 
 # Installation
@@ -63,11 +63,11 @@ docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c
 go install github.com/conductorone/baton/cmd/baton@main
 go install github.com/conductorone/baton-teleport/cmd/baton-teleport@main
 
-BATON_PROXYADDR=clientProxy baton-teleport 
+BATON_PROXYADDR=clientProxy baton-teleport
 baton resources
 ```
 
-# Quick Setup 
+# Quick Setup
 This is the fastest way to get started with `baton-teleport`. However, authentication is temporary and will expire after a short period.
 Ideal for quick testing of the connector or for use in short-lived environments.
 
@@ -78,10 +78,10 @@ tsh login --proxy=<cluster_name> --user=<email_account>
 
 2. Create auth.pem file
 ```bash
-tctl auth sign --proxy=<cluster_name> --user=<email_account> -o auth.pem 
+tctl auth sign --proxy=<cluster_name> --user=<email_account> -o auth.pem
 ```
 
-3. Run 
+3. Run
 ```bash
 baton-teleport --teleport-proxy-address=<cluster_name>:443 --teleport-key-path=auth.pem
 
@@ -89,8 +89,8 @@ baton-teleport --teleport-proxy-address=<cluster_name>:443 --teleport-key-path=a
 baton-teleport --teleport-proxy-address=conductorone.teleport.sh:443 --teleport-key-path=auth.pem
 ```
 
-# On-Prem Setup 
-This setup's token will not expire, but requires more steps.  
+# On-Prem Setup
+This setup's token will not expire, but requires more steps.
 https://goteleport.com/docs/enroll-resources/machine-id/deployment/linux/
 
 1. Create a bot
@@ -111,7 +111,7 @@ onboarding:
 storage:
   type: directory
   path: /var/lib/teleport/bot
-outputs: 
+outputs:
   - type: identity
     destination:
       type: directory
@@ -131,9 +131,9 @@ tbot -c /etc/tbot.yaml start
 ```
 
 5. Run the Baton Teleport Connector
-   * Replace <your-teleport-server> with your Teleport proxy address (e.g. example.teleport.sh:443).  
-   * Replace <your-client-id>@<your-instance> with the Client ID provided in the Baton dashboard. 
-   * Replace <your-client-secret> with the secret token from the Baton dashboard. 
+   * Replace <your-teleport-server> with your Teleport proxy address (e.g. example.teleport.sh:443).
+   * Replace <your-client-id>@<your-instance> with the Client ID provided in the Baton dashboard.
+   * Replace <your-client-secret> with the secret token from the Baton dashboard.
    * Replace <path-to-identity> with the same path you configured under outputs.destination.path in /etc/tbot.yaml, followed by /identity.
    ```
    baton-teleport \
@@ -145,7 +145,7 @@ tbot -c /etc/tbot.yaml start
    ```
 
 ## Run as a service
-You can also set the tbot to run as a service by following the instructions here:  
+You can also set the tbot to run as a service by following the instructions here:
 https://goteleport.com/docs/enroll-resources/machine-id/deployment/linux/#create-a-systemd-service
 
 # Local Teleport Instance Setup
@@ -170,7 +170,7 @@ TELEPORT_CONFIG_FILE="" tctl status
 ```
 sudo teleport start --config="/etc/teleport.yaml"
 ```
-5. Generate an invitation token with roles for the host. 
+5. Generate an invitation token with roles for the host.
 The invitation token is required for the local computer to join the cluster.
 ```
 TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
@@ -183,21 +183,21 @@ TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
     `--ca-pin=sha256:5fc6849caaf45eb70fb564224b727dbce31a32f2a8329910fcebc84aaaee7160` \
     --auth-server=baton-conductorone.teleport.sh:443
 
-6. Open the Teleport configuration file, `/etc/teleport.yaml`, 
-in an editor on the computer where you installed the Teleport agent and 
+6. Open the Teleport configuration file, `/etc/teleport.yaml`,
+in an editor on the computer where you installed the Teleport agent and
 replace `token` and `ca-pin` with those values you got from the previous step.
 
 7. Stop and Re-start teleport
 ```
 sudo teleport start --config="/etc/teleport.yaml"
 ```
-8. Generating `auth.pem` file using tctl admin tool 
+8. Generating `auth.pem` file using tctl admin tool
 ```
 TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email_account> --out=auth.pem
 ```
 
-## Alternatively, You can start teleport by generating an invitation token 
-1. Generate an invitation token with roles for the host. 
+## Alternatively, You can start teleport by generating an invitation token
+1. Generate an invitation token with roles for the host.
 ```
 TELEPORT_CONFIG_FILE="" tctl tokens add --type=node,app,db
 ```
@@ -213,7 +213,7 @@ export INVITE_TOKEN=<token>
 ```
 sudo teleport start --token=${INVITE_TOKEN?}
 ```
-5. Generating `auth.pem` file using tctl admin tool 
+5. Generating `auth.pem` file using tctl admin tool
 ```
 TELEPORT_CONFIG_FILE="" tctl auth sign --ttl=8h --user=<email_account> --out=auth.pem
 ```
