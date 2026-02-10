@@ -6,8 +6,10 @@ toolchain go1.24.2
 
 require (
 	github.com/conductorone/baton-sdk v0.3.15
+	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
 	github.com/gravitational/teleport/api v0.0.0-20241022213454-d82ee8440cbc
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
+	github.com/quasilyte/go-ruleguard/dsl v0.3.23
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
