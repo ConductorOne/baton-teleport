@@ -85,6 +85,20 @@ func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 	return rv, "", nil, nil
 }
 
+func (r *roleBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, parentResourceId *v2.ResourceId) (*v2.Resource, annotations.Annotations, error) {
+	role, err := r.client.GetRole(ctx, resourceId.Resource)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-teleport: failed to get role %s: %w", resourceId.Resource, err)
+	}
+
+	res, err := getRoleResource(role)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return res, nil, nil
+}
+
 func (r *roleBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	return []*v2.Entitlement{
 		ent.NewAssignmentEntitlement(
@@ -160,7 +174,7 @@ func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 	user.AddRole(prodRole.GetName())
 	updatedUser, err := r.client.UpdateUser(ctx, user.(*types.UserV2))
 	if err != nil {
-		return nil, fmt.Errorf("teleport-connector: failed to add role: %s", err.Error())
+		return nil, fmt.Errorf("baton-teleport: failed to add role: %w", err)
 	}
 
 	l.Warn("Role Membership has been created.",
@@ -184,7 +198,7 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 			zap.String("principal_type", principal.Id.ResourceType),
 			zap.String("principal_id", principal.Id.Resource),
 		)
-		return nil, fmt.Errorf("teleport-connector: only users can have role membership revoked")
+		return nil, fmt.Errorf("baton-teleport: only users can have role membership revoked")
 	}
 
 	roleName := entitlement.Resource.Id.Resource
@@ -204,7 +218,7 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 	user.SetRoles(roleList)
 	updatedUser, err := r.client.UpdateUser(ctx, user.(*types.UserV2))
 	if err != nil {
-		return nil, fmt.Errorf("teleport-connector: failed to revoke role: %s", err.Error())
+		return nil, fmt.Errorf("baton-teleport: failed to revoke role: %w", err)
 	}
 
 	l.Warn("Role Membership has been revoked.",

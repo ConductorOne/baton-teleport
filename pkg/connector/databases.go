@@ -64,6 +64,26 @@ func (d *dbBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pa
 	return rv, "", nil, nil
 }
 
+func (d *dbBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, parentResourceId *v2.ResourceId) (*v2.Resource, annotations.Annotations, error) {
+	databases, err := d.client.GetDatabases(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-teleport: failed to get databases: %w", err)
+	}
+
+	for _, db := range databases {
+		dbCopy := db
+		if db.GetRevision() == resourceId.Resource {
+			res, err := getDatabaseResource(dbCopy)
+			if err != nil {
+				return nil, nil, err
+			}
+			return res, nil, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("baton-teleport: database with id %s not found", resourceId.Resource)
+}
+
 func (d *dbBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	return []*v2.Entitlement{
 		ent.NewAssignmentEntitlement(

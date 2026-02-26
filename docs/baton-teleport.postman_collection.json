@@ -1,0 +1,570 @@
+{
+  "info": {
+    "name": "Baton Teleport - Connector API Calls",
+    "description": "Postman collection documenting all Teleport API calls made by the baton-teleport connector.\n\n**Important:** The connector uses Teleport's native Go gRPC client, not REST. However, Teleport exposes equivalent HTTP endpoints through its web proxy API. This collection uses those HTTP endpoints.\n\n**Authentication:** Teleport's web API uses bearer tokens obtained from a web session. Use the \"Login\" request first to get a session token, then it will be used automatically by other requests.\n\n**Setup:**\n1. Set the `proxy_address` variable to your Teleport cluster (e.g., `yourname.teleport.sh`)\n2. Run the \"Login\" request with your credentials\n3. The bearer token will be automatically saved for subsequent requests",
+    "_postman_id": "baton-teleport-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "proxy_address",
+      "value": "yourname.teleport.sh",
+      "type": "string",
+      "description": "Your Teleport proxy address (without port or protocol)"
+    },
+    {
+      "key": "cluster_name",
+      "value": "yourname.teleport.sh",
+      "type": "string",
+      "description": "Your Teleport cluster name (usually same as proxy address)"
+    },
+    {
+      "key": "bearer_token",
+      "value": "",
+      "type": "string",
+      "description": "Bearer token from web session (auto-populated by Login request)"
+    },
+    {
+      "key": "csrf_token",
+      "value": "",
+      "type": "string",
+      "description": "CSRF token (auto-populated by Login request)"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "description": "Authenticate to get a web session bearer token. Run the Login request first before any other requests.",
+      "item": [
+        {
+          "name": "Ping (Health Check)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/ping",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "ping"]
+            },
+            "description": "Check if the Teleport proxy is reachable. Returns cluster info, auth type, and server version. No authentication required."
+          }
+        },
+        {
+          "name": "Find (Cluster Info)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/find",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "find"]
+            },
+            "description": "Lightweight cluster discovery endpoint. Returns proxy address, auth preferences, and cluster name. No authentication required.\n\n**Connector equivalent:** Used implicitly during client connection setup."
+          }
+        },
+        {
+          "name": "Login (Create Web Session)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.token) {",
+                  "        pm.collectionVariables.set('bearer_token', jsonData.token);",
+                  "        console.log('Bearer token saved successfully');",
+                  "    }",
+                  "    if (jsonData.token_type === 'bearer') {",
+                  "        console.log('Token type: bearer');",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"your-username@example.com\",\n  \"pass\": \"your-password\",\n  \"second_factor_token\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/sessions/web",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "sessions", "web"]
+            },
+            "description": "Create a web session by logging in with username, password, and OTP code.\n\nThe `second_factor_token` is the 6-digit OTP code from your authenticator app.\n\nThe response contains a bearer token that will be automatically saved and used by other requests.\n\n**Note:** The connector does NOT use this endpoint. It authenticates via mTLS using the identity file (auth.pem). This endpoint is provided so you can authenticate Postman requests."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "User management operations. The connector syncs all users and supports account creation and deletion.\n\n**Connector methods:**\n- `List()` → GetUsers\n- `CreateAccount()` → CreateUser + CreateResetPasswordToken\n- `Delete()` → GetUser + DeleteUser",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/users",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "users"]
+            },
+            "description": "List all users in the Teleport cluster.\n\n**Connector method:** `userBuilder.List()`\n**Go SDK call:** `client.GetUsers(ctx, false)`\n\nReturns all users with their metadata, roles, traits, and status (locked/unlocked).\n\n**Fields used by connector:**\n- `name` → Resource ID and display name\n- `metadata.revision` → User profile ID\n- `status.is_locked` → User enabled/disabled status\n- `roles` → Used for grant generation\n- `spec.traits` → User traits\n- `IsBot()` → Account type (service vs human)"
+          }
+        },
+        {
+          "name": "Get User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/users/:username",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "users", ":username"],
+              "variable": [
+                {
+                  "key": "username",
+                  "value": "sacorral@comunidad.unnoba.edu.ar",
+                  "description": "Username to fetch"
+                }
+              ]
+            },
+            "description": "Get a specific user by username.\n\n**Connector method:** `userBuilder.Delete()` (to verify user exists and is local before deletion)\n**Go SDK call:** `client.GetUser(ctx, username, false)`\n\nAlso used in `roleBuilder.Grant()` and `roleBuilder.Revoke()` to fetch the user before modifying their roles."
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"new-user\",\n  \"roles\": [\"access\"],\n  \"traits\": {\n    \"logins\": [\"new-user\"]\n  }\n}"
+            },
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/users",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "users"]
+            },
+            "description": "Create a new local user in Teleport.\n\n**Connector method:** `userBuilder.CreateAccount()`\n**Go SDK call:** `client.CreateUser(ctx, user)`\n\nThe connector creates users with:\n- `kind`: \"user\"\n- `version`: \"v2\"\n- `metadata.name`: cleaned username\n- `spec.roles`: [\"access\"] (default) or specified role\n- `spec.traits.logins`: [username]\n\n**Important:** After creating the user, the connector also creates a password reset token (see next request)."
+          }
+        },
+        {
+          "name": "Update User (Add/Remove Roles)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"existing-user\",\n  \"roles\": [\"access\", \"editor\"],\n  \"traits\": {\n    \"logins\": [\"existing-user\"]\n  }\n}"
+            },
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/users",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "users"]
+            },
+            "description": "Update an existing user. Used by the connector to add or remove roles.\n\n**Connector methods:**\n- `roleBuilder.Grant()` → Adds a role to user's role list\n- `roleBuilder.Revoke()` → Removes a role from user's role list\n\n**Go SDK call:** `client.UpdateUser(ctx, user)`\n\n**Grant flow:**\n1. GetUser(username)\n2. Add role name to user's roles list\n3. Add username to user's logins\n4. UpdateUser(user)\n\n**Revoke flow:**\n1. GetUser(username)\n2. Remove role name from user's roles list\n3. UpdateUser(user)"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/users/:username",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "users", ":username"],
+              "variable": [
+                {
+                  "key": "username",
+                  "value": "user-to-delete",
+                  "description": "Username to delete"
+                }
+              ]
+            },
+            "description": "Delete a local user from Teleport.\n\n**Connector method:** `userBuilder.Delete()`\n**Go SDK call:** `client.DeleteUser(ctx, username)`\n\n**Important:** The connector first checks if the user is a local user (not SSO/federated). Only local users can be deleted via the connector."
+          }
+        },
+        {
+          "name": "Create Password Reset Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"new-user\",\n  \"type\": \"reset\",\n  \"ttl\": \"24h\"\n}"
+            },
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/users/password/token",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "users", "password", "token"]
+            },
+            "description": "Create a password reset token for a user. Returns a URL the user can visit to set their password.\n\n**Connector method:** `userBuilder.CreateAccount()` (called after creating the user)\n**Go SDK call:** `client.CreateResetPasswordToken(ctx, &proto.CreateResetPasswordTokenRequest{...})`\n\nThe connector creates tokens with a 24-hour TTL. The returned URL is sent to a ConductorOne vault so the new user can configure their password.\n\n**Note:** Teleport does not allow auto-generating passwords for new users due to security rules. This is why the connector returns a reset link instead."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Roles",
+      "description": "Role management operations. The connector syncs all roles and supports granting/revoking role membership.\n\n**Connector methods:**\n- `List()` → GetRoles\n- `Entitlements()` → Returns \"member\" entitlement per role\n- `Grants()` → GetUsers, then checks each user's roles\n- `Grant()` → GetUser + UpdateUser (add role)\n- `Revoke()` → GetUser + UpdateUser (remove role)",
+      "item": [
+        {
+          "name": "List Roles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/roles",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "roles"]
+            },
+            "description": "List all roles in the Teleport cluster.\n\n**Connector method:** `roleBuilder.List()`\n**Go SDK call:** `client.GetRoles(ctx)`\n\nReturns all roles with their metadata, allow/deny rules, and options.\n\n**Fields used by connector:**\n- `metadata.name` → Resource ID and display name\n- `metadata.revision` → Role profile ID\n- `metadata.description` → Role description in profile"
+          }
+        },
+        {
+          "name": "Get Role",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/roles/:name",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "roles", ":name"],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "access",
+                  "description": "Role name to fetch"
+                }
+              ]
+            },
+            "description": "Get a specific role by name.\n\n**Note:** Not directly used by the connector, but useful for inspecting role details (allow/deny rules, node labels, etc.)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Nodes",
+      "description": "Node (server) listing. The connector syncs nodes with pagination.\n\n**Connector methods:**\n- `List()` → GetResources (paginated)\n- `Grants()` → Not implemented (TODO: associate nodes with roles)",
+      "item": [
+        {
+          "name": "List Nodes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/sites/{{cluster_name}}/resources?kind=node&limit=50",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "sites", "{{cluster_name}}", "resources"],
+              "query": [
+                {
+                  "key": "kind",
+                  "value": "node",
+                  "description": "Resource type filter"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Page size"
+                },
+                {
+                  "key": "startKey",
+                  "value": "",
+                  "description": "Pagination token (empty for first page)",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List all nodes (servers) in the cluster. Supports pagination via `startKey`.\n\n**Connector method:** `nodeBuilder.List()`\n**Go SDK call:** `client.GetResources(ctx, &proto.ListResourcesRequest{ResourceType: \"node\", StartKey: token})`\n\n**Fields used by connector:**\n- `node.revision` → Node ID\n- `node.hostname` → Node name\n- `node.namespace` → Node namespace\n\n**Pagination:** Pass the `nextKey` from the response as `startKey` in the next request. Empty `nextKey` means no more pages."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Applications",
+      "description": "Application listing. The connector syncs registered applications.\n\n**Connector methods:**\n- `List()` → GetApps\n- `Grants()` → Not implemented (returns empty)",
+      "item": [
+        {
+          "name": "List Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/sites/{{cluster_name}}/resources?kind=app",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "sites", "{{cluster_name}}", "resources"],
+              "query": [
+                {
+                  "key": "kind",
+                  "value": "app",
+                  "description": "Resource type filter for applications"
+                }
+              ]
+            },
+            "description": "List all registered applications in the cluster.\n\n**Connector method:** `appBuilder.List()`\n**Go SDK call:** `client.GetApps(ctx)`\n\n**Fields used by connector:**\n- `metadata.revision` → App ID\n- `name` → App name"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Databases",
+      "description": "Database listing. The connector syncs registered databases.\n\n**Connector methods:**\n- `List()` → GetDatabases\n- `Grants()` → Not implemented (returns empty)",
+      "item": [
+        {
+          "name": "List Databases",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/sites/{{cluster_name}}/resources?kind=db",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "sites", "{{cluster_name}}", "resources"],
+              "query": [
+                {
+                  "key": "kind",
+                  "value": "db",
+                  "description": "Resource type filter for databases"
+                }
+              ]
+            },
+            "description": "List all registered databases in the cluster.\n\n**Connector method:** `dbBuilder.List()`\n**Go SDK call:** `client.GetDatabases(ctx)`\n\n**Fields used by connector:**\n- `revision` → Database ID\n- `name` → Database name"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit Events",
+      "description": "Audit event endpoints for querying cluster activity. Useful for implementing event feeds (usage tracking, audit logs).\n\n**Go SDK call:** `client.SearchEvents(ctx, from, to, namespace, eventTypes, limit, order, startKey)`",
+      "item": [
+        {
+          "name": "Search Events (All Types)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/sites/{{cluster_name}}/events/search?from=2026-02-13T00:00:00Z&to=2026-02-21T00:00:00Z&limit=20",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "sites", "{{cluster_name}}", "events", "search"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-02-13T00:00:00Z",
+                  "description": "Start time (RFC3339 format)"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-02-21T00:00:00Z",
+                  "description": "End time (RFC3339 format)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Maximum number of events to return"
+                },
+                {
+                  "key": "startKey",
+                  "value": "",
+                  "description": "Pagination key from previous response",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Search all audit events in a time range.\n\n**Go SDK call:** `client.SearchEvents(ctx, from, to, apidefaults.Namespace, nil, limit, types.EventOrderDescending, startKey)`\n\n**Common event types returned:**\n- `user.login` - User login (success/failure, MFA device)\n- `cert.create` - Certificate creation (identity, roles, IP)\n- `mfa_auth_challenge.create` - MFA challenge issued\n- `user.create` - User account created\n- `role.created` - Role created\n- `user.update` - User updated\n- `session.start` / `session.end` - SSH sessions\n\n**Pagination:** Use the `startKey` from the response to get the next page."
+          }
+        },
+        {
+          "name": "Search Events (User Logins Only)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/sites/{{cluster_name}}/events/search?from=2026-02-13T00:00:00Z&to=2026-02-21T00:00:00Z&limit=20&include=user.login",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "sites", "{{cluster_name}}", "events", "search"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-02-13T00:00:00Z",
+                  "description": "Start time (RFC3339 format)"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-02-21T00:00:00Z",
+                  "description": "End time (RFC3339 format)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Maximum number of events to return"
+                },
+                {
+                  "key": "include",
+                  "value": "user.login",
+                  "description": "Filter by event type"
+                }
+              ]
+            },
+            "description": "Search only user login events. Useful for usage tracking / last login.\n\n**Go SDK call:** `client.SearchEvents(ctx, from, to, apidefaults.Namespace, []string{\"user.login\"}, limit, order, startKey)`\n\n**Response fields:**\n- `user` - Who logged in\n- `success` - Login success/failure\n- `method` - Auth method (local, github, saml, oidc)\n- `mfa_device` - MFA device used (name, UUID, type)\n- `addr.remote` - Client IP address\n- `user_agent` - Client user agent"
+          }
+        },
+        {
+          "name": "Search Events (Audit Changes)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/sites/{{cluster_name}}/events/search?from=2026-02-13T00:00:00Z&to=2026-02-21T00:00:00Z&limit=20&include=user.create&include=user.update&include=user.delete&include=role.created&include=role.deleted",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "sites", "{{cluster_name}}", "events", "search"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-02-13T00:00:00Z",
+                  "description": "Start time (RFC3339 format)"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-02-21T00:00:00Z",
+                  "description": "End time (RFC3339 format)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Maximum number of events to return"
+                },
+                {
+                  "key": "include",
+                  "value": "user.create",
+                  "description": "User creation events"
+                },
+                {
+                  "key": "include",
+                  "value": "user.update",
+                  "description": "User update events"
+                },
+                {
+                  "key": "include",
+                  "value": "user.delete",
+                  "description": "User deletion events"
+                },
+                {
+                  "key": "include",
+                  "value": "role.created",
+                  "description": "Role creation events"
+                },
+                {
+                  "key": "include",
+                  "value": "role.deleted",
+                  "description": "Role deletion events"
+                }
+              ]
+            },
+            "description": "Search for access-related change events (user/role CRUD). Useful for audit log event feeds.\n\n**Go SDK call:** `client.SearchEvents(ctx, from, to, ns, []string{\"user.create\", \"user.update\", \"user.delete\", \"role.created\", \"role.deleted\"}, limit, order, startKey)`\n\n**Full list of event types:** https://goteleport.com/docs/reference/audit-events/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Unified Resources",
+      "description": "Teleport's unified resource listing endpoint. Not used directly by the connector, but useful for exploring all resources at once.",
+      "item": [
+        {
+          "name": "List All Resources (Unified)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://{{proxy_address}}/v1/webapi/sites/{{cluster_name}}/resources?limit=100",
+              "protocol": "https",
+              "host": ["{{proxy_address}}"],
+              "path": ["v1", "webapi", "sites", "{{cluster_name}}", "resources"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "description": "Maximum number of resources to return"
+                },
+                {
+                  "key": "kind",
+                  "value": "",
+                  "description": "Filter by resource type: node, app, db, kube_cluster, windows_desktop",
+                  "disabled": true
+                },
+                {
+                  "key": "query",
+                  "value": "",
+                  "description": "Search query string",
+                  "disabled": true
+                },
+                {
+                  "key": "startKey",
+                  "value": "",
+                  "description": "Pagination token",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List all infrastructure resources across types (nodes, apps, databases, Kubernetes clusters, Windows desktops).\n\nUseful for getting a complete view of what the connector will sync.\n\nFilter by type using the `kind` parameter:\n- `node` - Servers\n- `app` - Applications\n- `db` - Databases\n- `kube_cluster` - Kubernetes clusters\n- `windows_desktop` - Windows desktops"
+          }
+        }
+      ]
+    }
+  ]
+}

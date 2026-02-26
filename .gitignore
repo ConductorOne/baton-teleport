@@ -17,3 +17,7 @@ auth.pem
 # Dependency directories (remove the comment below to include it)
 # vendor/
 dist/
+baton-teleport
+*.pkg
+.claude/settings.local.json
+review-findings.json

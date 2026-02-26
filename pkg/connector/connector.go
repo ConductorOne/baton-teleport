@@ -2,11 +2,13 @@ package connector
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+
 	"github.com/conductorone/baton-teleport/pkg/client"
 )
 
@@ -62,10 +64,26 @@ func (d *Connector) Metadata(_ context.Context) (*v2.ConnectorMetadata, error) {
 	}, nil
 }
 
-// Validate is called to ensure that the connector is properly configured. It should exercise any API credentials
-// to be sure that they are valid.
 func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, error) {
+	_, err := d.client.Ping(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("baton-teleport: failed to validate connection: %w", err)
+	}
 	return nil, nil
+}
+
+func (d *Connector) Close() error {
+	if d.client != nil {
+		return d.client.Close()
+	}
+	return nil
+}
+
+func (d *Connector) EventFeeds(_ context.Context) []connectorbuilder.EventFeed {
+	return []connectorbuilder.EventFeed{
+		newUsageEventFeed(d.client),
+		newAuditEventFeed(d.client),
+	}
 }
 
 // New returns a new instance of the connector.
