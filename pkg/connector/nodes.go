@@ -70,38 +70,6 @@ func (n *nodeBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 	return rv, resp.NextKey, nil, nil
 }
 
-func (n *nodeBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, parentResourceId *v2.ResourceId) (*v2.Resource, annotations.Annotations, error) {
-	token := &pagination.Token{}
-	for {
-		resp, err := n.client.GetNodes(ctx, token)
-		if err != nil {
-			return nil, nil, fmt.Errorf("baton-teleport: failed to get nodes: %w", err)
-		}
-
-		for _, nodeWrapper := range resp.GetResources() {
-			node := nodeWrapper.GetNode()
-			if node.GetRevision() == resourceId.Resource {
-				res, err := getNodeResource(&Node{
-					Id:        node.GetRevision(),
-					Name:      node.GetHostname(),
-					Namespace: node.GetNamespace(),
-				})
-				if err != nil {
-					return nil, nil, err
-				}
-				return res, nil, nil
-			}
-		}
-
-		if resp.NextKey == "" {
-			break
-		}
-		token.Token = resp.NextKey
-	}
-
-	return nil, nil, fmt.Errorf("baton-teleport: node with id %s not found", resourceId.Resource)
-}
-
 func (r *nodeBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	return []*v2.Entitlement{
 		ent.NewAssignmentEntitlement(

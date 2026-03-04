@@ -64,26 +64,6 @@ func (a *appBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *p
 	return rv, "", nil, nil
 }
 
-func (a *appBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, parentResourceId *v2.ResourceId) (*v2.Resource, annotations.Annotations, error) {
-	apps, err := a.client.GetApps(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("baton-teleport: failed to get apps: %w", err)
-	}
-
-	for _, app := range apps {
-		appCopy := app
-		if app.GetMetadata().Revision == resourceId.Resource {
-			res, err := getAppResource(appCopy)
-			if err != nil {
-				return nil, nil, err
-			}
-			return res, nil, nil
-		}
-	}
-
-	return nil, nil, fmt.Errorf("baton-teleport: app with id %s not found", resourceId.Resource)
-}
-
 func (a *appBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	return []*v2.Entitlement{
 		ent.NewAssignmentEntitlement(
