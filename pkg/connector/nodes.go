@@ -26,8 +26,6 @@ type Node struct {
 	Namespace string
 }
 
-var mapNodes = make(map[string]Node)
-
 func (n *nodeBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return n.resourceType
 }
@@ -49,33 +47,27 @@ func getNodeResource(node *Node) (*v2.Resource, error) {
 }
 
 // List returns all the nodes from the database as resource objects.
-// Nodes include a NodeTrait because they are the 'shape' of a standard node.
 func (n *nodeBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
-	nodes, err := n.client.GetNodes(ctx, token)
+	resp, err := n.client.GetNodes(ctx, token)
 	if err != nil {
 		return nil, "", nil, err
 	}
 
-	for _, node := range nodes.GetResources() {
-		id := node.GetNode().GetRevision()
-		mapNodes[id] = Node{
-			Id:        id,
-			Name:      node.GetNode().GetHostname(),
-			Namespace: node.GetNode().GetNamespace(),
-		}
-	}
-
-	for _, node := range mapNodes {
-		nodeCopy := node
-		rr, err := getNodeResource(&nodeCopy)
+	for _, nodeWrapper := range resp.GetResources() {
+		node := nodeWrapper.GetNode()
+		rr, err := getNodeResource(&Node{
+			Id:        node.GetRevision(),
+			Name:      node.GetHostname(),
+			Namespace: node.GetNamespace(),
+		})
 		if err != nil {
 			return nil, "", nil, err
 		}
 		rv = append(rv, rr)
 	}
 
-	return rv, nodes.NextKey, nil, nil
+	return rv, resp.NextKey, nil, nil
 }
 
 func (r *nodeBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {

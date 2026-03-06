@@ -48,7 +48,6 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 		"last_name":  lastName,
 	}
 
-	// Teleport does not store an email natively for users.
 	if accountType == v2.UserTrait_ACCOUNT_TYPE_HUMAN {
 		profile["email"] = name
 	}
@@ -72,6 +71,7 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 	if accountType == v2.UserTrait_ACCOUNT_TYPE_HUMAN {
 		opts = append(opts, resource.WithEmail(name, true))
 	}
+
 	return resource.NewUserResource(
 		name,
 		userResourceType,
@@ -93,7 +93,7 @@ func (u *userBuilder) CreateAccountCapabilityDetails(_ context.Context) (*v2.Cre
 func (u *userBuilder) CreateAccount(
 	ctx context.Context,
 	accountInfo *v2.AccountInfo,
-	_ *v2.CredentialOptions,
+	_ *v2.LocalCredentialOptions,
 ) (connectorbuilder.CreateAccountResponse, []*v2.PlaintextData, annotations.Annotations, error) {
 	newUser, err := createNewUserInfo(accountInfo)
 	if err != nil {
@@ -161,6 +161,24 @@ func createNewUserInfo(accountInfo *v2.AccountInfo) (*types.UserV2, error) {
 			},
 		},
 	}, nil
+}
+
+func (u *userBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, parentResourceId *v2.ResourceId) (*v2.Resource, annotations.Annotations, error) {
+	if resourceId == nil {
+		return nil, nil, fmt.Errorf("baton-teleport: resourceId is required")
+	}
+
+	user, err := u.client.GetUser(ctx, resourceId.Resource, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-teleport: failed to get user %s: %w", resourceId.Resource, err)
+	}
+
+	r, err := userResource(parentResourceId, user)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return r, nil, nil
 }
 
 func (u *userBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId) (annotations.Annotations, error) {

@@ -1,10 +1,7 @@
 package ugrpc
 
 import (
-	"bytes"
 	"context"
-	"crypto/ed25519"
-	"encoding/base64"
 	"errors"
 	"net"
 	"net/http"
@@ -13,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/conductorone/baton-sdk/pkg/crypto"
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/json"
@@ -30,13 +28,11 @@ const (
 )
 
 var (
-	ErrInvalidClientSecret = errors.New("invalid client secret")
-	ErrInvalidClientID     = errors.New("invalid client id")
-
-	v1SecretTokenIdentifier = []byte("v1")
+	ErrInvalidClientID = errors.New("invalid client id")
 )
 
 type c1Token struct {
+	//nolint:gosec // OAuth2 response schema requires this field name and JSON tag.
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
 	Expiry      int    `json:"expires_in"`
@@ -64,39 +60,6 @@ func parseClientID(input string) (string, string, error) {
 	}
 
 	return clientName, items[0], nil
-}
-
-func parseSecret(input []byte) (*jose.JSONWebKey, error) {
-	items := bytes.SplitN(input, []byte(":"), 4)
-	if len(items) != 4 {
-		return nil, ErrInvalidClientSecret
-	}
-
-	if !bytes.Equal(items[2], v1SecretTokenIdentifier) {
-		return nil, ErrInvalidClientSecret
-	}
-
-	jwkData, err := base64.RawURLEncoding.DecodeString(string(items[3]))
-	if err != nil {
-		return nil, ErrInvalidClientSecret
-	}
-
-	npk := &jose.JSONWebKey{}
-	err = npk.UnmarshalJSON(jwkData)
-	if err != nil {
-		return nil, ErrInvalidClientSecret
-	}
-
-	if npk.IsPublic() || !npk.Valid() {
-		return nil, ErrInvalidClientSecret
-	}
-
-	_, ok := npk.Key.(ed25519.PrivateKey)
-	if !ok {
-		return nil, ErrInvalidClientSecret
-	}
-
-	return npk, nil
 }
 
 func (c *c1TokenSource) Token() (*oauth2.Token, error) {
@@ -164,6 +127,7 @@ func (c *c1TokenSource) Token() (*oauth2.Token, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	//nolint:gosec // token endpoint host is configured by baton client ID/env and is expected to be remote.
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -197,7 +161,7 @@ func newC1TokenSource(ctx context.Context, clientID string, clientSecret string)
 		return nil, "", "", err
 	}
 
-	secret, err := parseSecret([]byte(clientSecret))
+	secret, err := crypto.ParseClientSecret([]byte(clientSecret), false)
 	if err != nil {
 		return nil, "", "", err
 	}

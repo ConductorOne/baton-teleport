@@ -207,6 +207,14 @@ func (c *Connector) Close() error {
 - Don't return nil from Close() if you created clients
 - Don't return error on "already exists" for Grant operations
 - Don't use `%v` or `%g` with large numeric IDs (use `%d` or `strconv` to avoid scientific notation)
+- Don't query audit logs for last login during `List()` if a usage event feed exists -- ConductorOne derives last login from usage events
+- Don't emit `ResourceChangeEvent` for delete events in the event feed -- C1 calls `Get()` on the resource, which returns "not found" for deleted resources and C1 cannot distinguish this from a transient error. Deletions are reconciled during the next full sync instead.
+
+## LastLogin: Usage Event Feed vs WithLastLogin Trait
+
+- **`WithLastLogin()` in `List()`**: Only use when the downstream API's user object natively includes a last login timestamp (e.g., Okta, Google Workspace). Simply read the field and pass it to the trait.
+- **Usage Event Feed**: Use when the downstream API does NOT store last login on the user object but does have an audit/event log (e.g., Teleport). Stream `user.login` events via `EventFeed` and let ConductorOne derive the last login server-side.
+- **Never both**: Do NOT query audit logs in `List()` to populate `WithLastLogin()` when a usage event feed already streams the same data. This duplicates work, adds latency to every sync, and makes unnecessary API calls.
 
 ## SDK Features: Usage Notes
 
