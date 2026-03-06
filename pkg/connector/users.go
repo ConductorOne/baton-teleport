@@ -164,6 +164,10 @@ func createNewUserInfo(accountInfo *v2.AccountInfo) (*types.UserV2, error) {
 }
 
 func (u *userBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, parentResourceId *v2.ResourceId) (*v2.Resource, annotations.Annotations, error) {
+	if resourceId == nil {
+		return nil, nil, fmt.Errorf("baton-teleport: resourceId is required")
+	}
+
 	user, err := u.client.GetUser(ctx, resourceId.Resource, false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("baton-teleport: failed to get user %s: %w", resourceId.Resource, err)

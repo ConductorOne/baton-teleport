@@ -289,12 +289,9 @@ func makeResourceChangeEvent(id string, t time.Time, resourceType, resourceName 
 	}
 }
 
-// makeCreateGrantEvent builds a v2.Event wrapping a CreateGrantEvent that
-// signals a role membership was assigned to a user.
-//
-// The entitlement mirrors what roles.go declares during the full sync:
-// an assignment entitlement named "member" on the role resource.
-func makeCreateGrantEvent(id string, t time.Time, roleName, userName string) *v2.Event {
+// roleMembershipEntitlementAndPrincipal builds the shared entitlement and
+// principal used by both grant and revoke event constructors.
+func roleMembershipEntitlementAndPrincipal(roleName, userName string) (*v2.Entitlement, *v2.Resource) {
 	roleResource := &v2.Resource{
 		Id: &v2.ResourceId{
 			ResourceType: roleResourceType.Id,
@@ -303,16 +300,19 @@ func makeCreateGrantEvent(id string, t time.Time, roleName, userName string) *v2
 		DisplayName: roleName,
 	}
 
-	entitlement := ent.NewAssignmentEntitlement(roleResource, roleMembership)
-
-	principal := &v2.Resource{
+	return ent.NewAssignmentEntitlement(roleResource, roleMembership), &v2.Resource{
 		Id: &v2.ResourceId{
 			ResourceType: userResourceType.Id,
 			Resource:     userName,
 		},
 		DisplayName: userName,
 	}
+}
 
+// makeCreateGrantEvent builds a v2.Event wrapping a CreateGrantEvent that
+// signals a role membership was assigned to a user.
+func makeCreateGrantEvent(id string, t time.Time, roleName, userName string) *v2.Event {
+	entitlement, principal := roleMembershipEntitlementAndPrincipal(roleName, userName)
 	return &v2.Event{
 		Id:         id,
 		OccurredAt: timestamppb.New(t),
@@ -326,29 +326,9 @@ func makeCreateGrantEvent(id string, t time.Time, roleName, userName string) *v2
 }
 
 // makeCreateRevokeEvent builds a v2.Event wrapping a CreateRevokeEvent that
-// signals a role membership was removed from a user (e.g. access request expired).
-//
-// The entitlement mirrors what roles.go declares during the full sync:
-// an assignment entitlement named "member" on the role resource.
+// signals a role membership was removed from a user.
 func makeCreateRevokeEvent(id string, t time.Time, roleName, userName string) *v2.Event {
-	roleResource := &v2.Resource{
-		Id: &v2.ResourceId{
-			ResourceType: roleResourceType.Id,
-			Resource:     roleName,
-		},
-		DisplayName: roleName,
-	}
-
-	entitlement := ent.NewAssignmentEntitlement(roleResource, roleMembership)
-
-	principal := &v2.Resource{
-		Id: &v2.ResourceId{
-			ResourceType: userResourceType.Id,
-			Resource:     userName,
-		},
-		DisplayName: userName,
-	}
-
+	entitlement, principal := roleMembershipEntitlementAndPrincipal(roleName, userName)
 	return &v2.Event{
 		Id:         id,
 		OccurredAt: timestamppb.New(t),

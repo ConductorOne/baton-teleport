@@ -86,6 +86,10 @@ func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 }
 
 func (r *roleBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, parentResourceId *v2.ResourceId) (*v2.Resource, annotations.Annotations, error) {
+	if resourceId == nil {
+		return nil, nil, fmt.Errorf("baton-teleport: resourceId is required")
+	}
+
 	role, err := r.client.GetRole(ctx, resourceId.Resource)
 	if err != nil {
 		return nil, nil, fmt.Errorf("baton-teleport: failed to get role %s: %w", resourceId.Resource, err)
