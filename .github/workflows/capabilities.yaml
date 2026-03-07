@@ -24,6 +24,9 @@ jobs:
         run: go build -o connector ./cmd/baton-teleport
 
       - name: Run and save output
+        env:
+          BATON_TELEPORT_PROXY_ADDRESS: fake.teleport.sh:443
+          BATON_TELEPORT_KEY_PATH: /dev/null
         run: ./connector capabilities > baton_capabilities.json
 
       - name: Commit changes
