@@ -32,7 +32,7 @@ func main() {
 
 	fmt.Fprintln(os.Stdout, "=== USAGE EVENTS (user.login - last 7 days) ===")
 	loginResult, _, err := client.SearchEvents(ctx, now.Add(-7*24*time.Hour), now, apidefaults.Namespace,
-		[]string{"user.login"}, 50, types.EventOrderDescending, "")
+		[]string{"user.login"}, 50, types.EventOrderDescending, "", "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to search login events: %v\n", err)
 	} else {
@@ -67,7 +67,7 @@ func main() {
 		"lock.created", "lock.deleted",
 	}
 	auditResult, _, err := client.SearchEvents(ctx, from, now, apidefaults.Namespace,
-		auditTypes, 100, types.EventOrderAscending, "")
+		auditTypes, 100, types.EventOrderAscending, "", "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to search audit events: %v\n", err)
 		return

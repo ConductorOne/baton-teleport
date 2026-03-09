@@ -65,6 +65,7 @@ func (e *usageEventFeed) ListEvents(
 		eventsPageSize,
 		types.EventOrderAscending,
 		cursor.LastKey,
+		"",
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("baton-teleport: failed to search usage events: %w", err)

@@ -8,9 +8,9 @@
       },
       "capabilities":  [
         "CAPABILITY_SYNC",
-        "CAPABILITY_TARGETED_SYNC",
         "CAPABILITY_PROVISION"
-      ]
+      ],
+      "permissions":  {}
     },
     {
       "resourceType":  {
@@ -19,9 +19,9 @@
       },
       "capabilities":  [
         "CAPABILITY_SYNC",
-        "CAPABILITY_TARGETED_SYNC",
         "CAPABILITY_PROVISION"
-      ]
+      ],
+      "permissions":  {}
     },
     {
       "resourceType":  {
@@ -30,9 +30,9 @@
       },
       "capabilities":  [
         "CAPABILITY_SYNC",
-        "CAPABILITY_TARGETED_SYNC",
         "CAPABILITY_PROVISION"
-      ]
+      ],
+      "permissions":  {}
     },
     {
       "resourceType":  {
@@ -44,9 +44,9 @@
       },
       "capabilities":  [
         "CAPABILITY_SYNC",
-        "CAPABILITY_TARGETED_SYNC",
         "CAPABILITY_PROVISION"
-      ]
+      ],
+      "permissions":  {}
     },
     {
       "resourceType":  {
@@ -63,10 +63,10 @@
       },
       "capabilities":  [
         "CAPABILITY_SYNC",
-        "CAPABILITY_TARGETED_SYNC",
         "CAPABILITY_ACCOUNT_PROVISIONING",
         "CAPABILITY_RESOURCE_DELETE"
-      ]
+      ],
+      "permissions":  {}
     }
   ],
   "connectorCapabilities":  [
@@ -74,7 +74,14 @@
     "CAPABILITY_SYNC",
     "CAPABILITY_ACCOUNT_PROVISIONING",
     "CAPABILITY_RESOURCE_DELETE",
-    "CAPABILITY_EVENT_FEED_V2",
-    "CAPABILITY_SERVICE_MODE_TARGETED_SYNC"
-  ]
+    "CAPABILITY_EVENT_FEED_V2"
+  ],
+  "credentialDetails":  {
+    "capabilityAccountProvisioning":  {
+      "supportedCredentialOptions":  [
+        "CAPABILITY_DETAIL_CREDENTIAL_OPTION_NO_PASSWORD"
+      ],
+      "preferredCredentialOption":  "CAPABILITY_DETAIL_CREDENTIAL_OPTION_NO_PASSWORD"
+    }
+  }
 }

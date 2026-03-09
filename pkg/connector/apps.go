@@ -6,7 +6,6 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/gravitational/teleport/api/types"
 
@@ -45,26 +44,26 @@ func getAppResource(app types.Application) (*v2.Resource, error) {
 
 // List returns all the apps from the database as resource objects.
 // Apps include a NodeTrait because they are the 'shape' of a standard node.
-func (a *appBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (a *appBuilder) List(ctx context.Context, _ *v2.ResourceId, _ rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
 	var rv []*v2.Resource
 	apps, err := a.client.GetApps(ctx)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	for _, app := range apps {
 		appCopy := app
 		rr, err := getAppResource(appCopy)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 		rv = append(rv, rr)
 	}
 
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
-func (a *appBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (a *appBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
 	return []*v2.Entitlement{
 		ent.NewAssignmentEntitlement(
 			resource,
@@ -73,18 +72,18 @@ func (a *appBuilder) Entitlements(ctx context.Context, resource *v2.Resource, to
 			ent.WithDisplayName(fmt.Sprintf("%s App %s", resource.DisplayName, appMembership)),
 			ent.WithDescription(fmt.Sprintf("Member of %s Teleport app", resource.DisplayName)),
 		),
-	}, "", nil, nil
+	}, nil, nil
 }
 
-func (a *appBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (a *appBuilder) Grants(_ context.Context, _ *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
+	return nil, nil, nil
 }
 
-func (a *appBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
-	return nil, nil
+func (a *appBuilder) Grant(_ context.Context, _ *v2.Resource, _ *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
+	return nil, nil, nil
 }
 
-func (a *appBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
+func (a *appBuilder) Revoke(_ context.Context, _ *v2.Grant) (annotations.Annotations, error) {
 	return nil, nil
 }
 

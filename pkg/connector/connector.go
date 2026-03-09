@@ -7,7 +7,10 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/cli"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+
+	cfg "github.com/conductorone/baton-teleport/pkg/config"
 
 	"github.com/conductorone/baton-teleport/pkg/client"
 )
@@ -17,8 +20,8 @@ type Connector struct {
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
-func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
-	return []connectorbuilder.ResourceSyncer{
+func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncerV2 {
+	return []connectorbuilder.ResourceSyncerV2{
 		newUserBuilder(d.client),
 		newRoleBuilder(d.client),
 		newNodeBuilder(d.client),
@@ -79,7 +82,7 @@ func (d *Connector) Close() error {
 	return nil
 }
 
-func (d *Connector) EventFeeds(_ context.Context) []connectorbuilder.EventFeed {
+func (d *Connector) EventFeeds(ctx context.Context) []connectorbuilder.EventFeed {
 	return []connectorbuilder.EventFeed{
 		newUsageEventFeed(d.client),
 		newAuditEventFeed(d.client),
@@ -87,18 +90,13 @@ func (d *Connector) EventFeeds(_ context.Context) []connectorbuilder.EventFeed {
 }
 
 // New returns a new instance of the connector.
-func New(
-	ctx context.Context,
-	proxyAddress string,
-	keyFilePath string,
-	key string,
-) (*Connector, error) {
-	tc, err := client.New(ctx, proxyAddress, keyFilePath, key)
+func New(ctx context.Context, c *cfg.Teleport, opts *cli.ConnectorOpts) (connectorbuilder.ConnectorBuilderV2, []connectorbuilder.Opt, error) {
+	tc, err := client.New(ctx, c.TeleportProxyAddress, c.TeleportKeyPath, c.TeleportKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("baton-teleport: failed to create teleport client: %w", err)
 	}
 
 	return &Connector{
 		client: tc,
-	}, nil
+	}, nil, nil
 }

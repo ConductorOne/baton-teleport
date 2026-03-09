@@ -46,7 +46,7 @@ func (c *Client) GetDynamicWindowsDesktop(ctx context.Context, name string) (typ
 	return desktop, trace.Wrap(err)
 }
 
-func (c *Client) ListDynamicWindowsDesktop(ctx context.Context, pageSize int, pageToken string) ([]types.DynamicWindowsDesktop, string, error) {
+func (c *Client) ListDynamicWindowsDesktops(ctx context.Context, pageSize int, pageToken string) ([]types.DynamicWindowsDesktop, string, error) {
 	resp, err := c.grpcClient.ListDynamicWindowsDesktops(ctx, &dynamicwindows.ListDynamicWindowsDesktopsRequest{
 		PageSize:  int32(pageSize),
 		PageToken: pageToken,
@@ -77,6 +77,18 @@ func (c *Client) UpdateDynamicWindowsDesktop(ctx context.Context, desktop types.
 	switch desktop := desktop.(type) {
 	case *types.DynamicWindowsDesktopV1:
 		desktop, err := c.grpcClient.UpdateDynamicWindowsDesktop(ctx, &dynamicwindows.UpdateDynamicWindowsDesktopRequest{
+			Desktop: desktop,
+		})
+		return desktop, trace.Wrap(err)
+	default:
+		return nil, trace.BadParameter("unknown desktop type: %T", desktop)
+	}
+}
+
+func (c *Client) UpsertDynamicWindowsDesktop(ctx context.Context, desktop types.DynamicWindowsDesktop) (types.DynamicWindowsDesktop, error) {
+	switch desktop := desktop.(type) {
+	case *types.DynamicWindowsDesktopV1:
+		desktop, err := c.grpcClient.UpsertDynamicWindowsDesktop(ctx, &dynamicwindows.UpsertDynamicWindowsDesktopRequest{
 			Desktop: desktop,
 		})
 		return desktop, trace.Wrap(err)

@@ -262,7 +262,7 @@ func NewC1ZFile(ctx context.Context, outputFilePath string, opts ...C1ZOption) (
 
 func cleanupDbDir(dbFilePath string, err error) error {
 	// Stat dbFilePath to make sure it's a file, not a directory.
-	stat, statErr := os.Stat(dbFilePath) //nolint:gosec // G703 -- dbFilePath is a caller-provided path by design.
+	stat, statErr := os.Stat(dbFilePath)
 	if statErr != nil {
 		if errors.Is(statErr, os.ErrNotExist) {
 			// If the file doesn't exist, we can't clean up the directory.
@@ -275,7 +275,7 @@ func cleanupDbDir(dbFilePath string, err error) error {
 		return errors.Join(err, fmt.Errorf("cleanupDbDir: dbFilePath %s is a directory, not a file: %w", dbFilePath, statErr))
 	}
 
-	cleanupErr := os.RemoveAll(filepath.Dir(dbFilePath)) //nolint:gosec // G703 -- dbFilePath is a caller-provided path by design.
+	cleanupErr := os.RemoveAll(filepath.Dir(dbFilePath))
 	if cleanupErr != nil {
 		err = errors.Join(err, cleanupErr)
 	}
@@ -473,18 +473,14 @@ func (c *C1File) InitTables(ctx context.Context) error {
 		query, args := t.Schema()
 		_, err = c.db.ExecContext(ctx, fmt.Sprintf(query, args...))
 		if err != nil {
+			l.Error("c1file-init-tables: error initializing table schema", zap.Error(err), zap.String("table_name", t.Name()))
 			return fmt.Errorf("c1file-init-tables: error initializing table %s: %w", t.Name(), err)
 		}
-		l.Debug("c1file-init-tables: initialized table schema, running migrations",
-			zap.String("table_name", t.Name()),
-		)
 		err = t.Migrations(ctx, c.db)
 		if err != nil {
+			l.Error("c1file-init-tables: error running migration", zap.Error(err), zap.String("table_name", t.Name()))
 			return fmt.Errorf("c1file-init-tables: error running migration for table %s: %w", t.Name(), err)
 		}
-		l.Debug("c1file-init-tables: ran migrations for table",
-			zap.String("table_name", t.Name()),
-		)
 	}
 
 	return nil

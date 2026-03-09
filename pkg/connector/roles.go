@@ -6,7 +6,6 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
@@ -64,28 +63,28 @@ func (r *roleBuilder) GetUsers(ctx context.Context) ([]types.User, error) {
 
 // List returns all the roles from the database as resource objects.
 // Roles include a RoleTrait because they are the 'shape' of a standard role.
-func (r *roleBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (r *roleBuilder) List(ctx context.Context, _ *v2.ResourceId, _ rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
 	var rv []*v2.Resource
 	roles, err := r.client.GetRoles(ctx)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	for _, role := range roles {
 		roleCopy := role
 		rr, err := getRoleResource(roleCopy)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 		rv = append(rv, rr)
 	}
 
 	// clear the cache
 	r.userCache = []types.User{}
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
-func (r *roleBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, parentResourceId *v2.ResourceId) (*v2.Resource, annotations.Annotations, error) {
+func (r *roleBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, _ *v2.ResourceId) (*v2.Resource, annotations.Annotations, error) {
 	if resourceId == nil {
 		return nil, nil, fmt.Errorf("baton-teleport: resourceId is required")
 	}
@@ -103,7 +102,7 @@ func (r *roleBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, parent
 	return res, nil, nil
 }
 
-func (r *roleBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (r *roleBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
 	return []*v2.Entitlement{
 		ent.NewAssignmentEntitlement(
 			resource,
@@ -112,21 +111,21 @@ func (r *roleBuilder) Entitlements(ctx context.Context, resource *v2.Resource, t
 			ent.WithDisplayName(fmt.Sprintf("%s Role %s", resource.DisplayName, roleMembership)),
 			ent.WithDescription(fmt.Sprintf("Member of %s Teleport role", resource.DisplayName)),
 		),
-	}, "", nil, nil
+	}, nil, nil
 }
 
-func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
 	var rv []*v2.Grant
 	users, err := r.GetUsers(ctx)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	for _, user := range users {
 		userCopy := user
 		ur, err := userResource(resource.Id, userCopy)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("error creating user resource for role %s: %w", resource.Id.Resource, err)
+			return nil, nil, fmt.Errorf("error creating user resource for role %s: %w", resource.Id.Resource, err)
 		}
 
 		for _, role := range user.GetRoles() {
@@ -139,10 +138,10 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 		}
 	}
 
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
-func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
+func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 	userName := principal.Id.Resource
 	roleName := entitlement.Resource.Id.Resource
@@ -152,10 +151,9 @@ func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 			zap.String("principal_type", principal.Id.ResourceType),
 			zap.String("principal_id", principal.Id.Resource),
 		)
-		return nil, fmt.Errorf("baton-teleport: only users can be granted role membership")
+		return nil, nil, fmt.Errorf("baton-teleport: only users can be granted role membership")
 	}
 
-	// Create an MFA required role for "prod" nodes.
 	prodRole, err := types.NewRole(roleName, types.RoleSpecV6{
 		Options: types.RoleOptions{
 			RequireMFAType: types.RequireMFAType_SESSION,
@@ -166,19 +164,19 @@ func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	user, err := r.client.GetUser(ctx, userName, false)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	user.SetLogins(append(user.GetLogins(), userName))
 	user.AddRole(prodRole.GetName())
 	updatedUser, err := r.client.UpdateUser(ctx, user.(*types.UserV2))
 	if err != nil {
-		return nil, fmt.Errorf("baton-teleport: failed to add role: %w", err)
+		return nil, nil, fmt.Errorf("baton-teleport: failed to grant role: %w", err)
 	}
 
 	l.Warn("Role Membership has been created.",
@@ -187,7 +185,7 @@ func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		zap.Time("CreatedAt", updatedUser.GetCreatedBy().Time),
 	)
 
-	return nil, nil
+	return nil, nil, nil
 }
 
 func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
+	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/conductorone/baton-teleport/pkg/client"
 	"github.com/stretchr/testify/require"
 )
@@ -39,7 +39,7 @@ func TestRoles(t *testing.T) {
 	resource := GetRoleResourceForTesting(t, roleName, roleDescription)
 
 	t.Run("role builder should fetch a list of users", func(t *testing.T) {
-		res, _, _, err := r.List(ctx, &v2.ResourceId{}, &pagination.Token{})
+		res, _, err := r.List(ctx, &v2.ResourceId{}, rs.SyncOpAttrs{})
 		require.Nil(t, err)
 		require.NotNil(t, res)
 	})
@@ -48,7 +48,6 @@ func TestRoles(t *testing.T) {
 		gr := grant.NewGrant(resource, roleEntitlement, principal.Id)
 		require.NotNil(t, gr)
 
-		// --revoke-grant "role:reviewer:member:user:miguel_chavez_m@hotmail.com"
 		_, err = r.Revoke(ctx, gr)
 		require.Nil(t, err)
 	})
@@ -57,10 +56,7 @@ func TestRoles(t *testing.T) {
 		entitlement := GetEntitlementForTesting(resource, roleName, roleEntitlement)
 		require.NotNil(t, entitlement)
 
-		// --grant-entitlement "role:reviewer:member" \
-		//   --grant-principal-type user \
-		//   --grant-principal "miguel_chavez_m@hotmail.com"
-		_, err = r.Grant(ctx, principal, entitlement)
+		_, _, err = r.Grant(ctx, principal, entitlement)
 		require.Nil(t, err)
 	})
 }
