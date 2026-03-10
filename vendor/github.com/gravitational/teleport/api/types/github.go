@@ -73,6 +73,12 @@ type GithubConnector interface {
 	GetAPIEndpointURL() string
 	// GetClientRedirectSettings returns the client redirect settings.
 	GetClientRedirectSettings() *SSOClientRedirectSettings
+	// GetUserMatchers returns the set of glob patterns to narrow down which username(s) this auth connector should
+	// match for identifier-first login.
+	GetUserMatchers() []string
+	// SetUserMatchers sets the set of glob patterns to narrow down which username(s) this auth connector should match
+	// for identifier-first login.
+	SetUserMatchers([]string)
 }
 
 // NewGithubConnector creates a new Github connector from name and spec
@@ -323,6 +329,21 @@ func (c *GithubConnectorV3) MapClaims(claims GithubClaims) ([]string, []string, 
 	return utils.Deduplicate(roles), utils.Deduplicate(kubeGroups), utils.Deduplicate(kubeUsers)
 }
 
+// GetUserMatchers returns the set of glob patterns to narrow down which username(s) this auth connector should
+// match for identifier-first login.
+func (r *GithubConnectorV3) GetUserMatchers() []string {
+	if r.Spec.UserMatchers == nil {
+		return nil
+	}
+	return r.Spec.UserMatchers
+}
+
+// SetUserMatchers sets the set of glob patterns to narrow down which username(s) this auth connector should match
+// for identifier-first login.
+func (r *GithubConnectorV3) SetUserMatchers(userMatchers []string) {
+	r.Spec.UserMatchers = userMatchers
+}
+
 // SetExpiry sets expiry time for the object
 func (r *GithubAuthRequest) SetExpiry(expires time.Time) {
 	r.Expires = &expires
@@ -338,6 +359,9 @@ func (r *GithubAuthRequest) Expiry() time.Time {
 
 // Check makes sure the request is valid
 func (r *GithubAuthRequest) Check() error {
+	authenticatedUserFlow := r.AuthenticatedUser != ""
+	regularLoginFlow := !r.SSOTestFlow && !authenticatedUserFlow
+
 	switch {
 	case r.ConnectorID == "":
 		return trace.BadParameter("missing ConnectorID")
@@ -346,28 +370,18 @@ func (r *GithubAuthRequest) Check() error {
 	// we could collapse these two checks into one, but the error message would become ambiguous.
 	case r.SSOTestFlow && r.ConnectorSpec == nil:
 		return trace.BadParameter("ConnectorSpec cannot be nil when SSOTestFlow is true")
-	case !r.SSOTestFlow && r.ConnectorSpec != nil:
-		return trace.BadParameter("ConnectorSpec must be nil when SSOTestFlow is false")
-	case len(r.PublicKey) != 0 && len(r.SshPublicKey) != 0:
-		return trace.BadParameter("illegal to set both PublicKey and SshPublicKey")
-	case len(r.PublicKey) != 0 && len(r.TlsPublicKey) != 0:
-		return trace.BadParameter("illegal to set both PublicKey and TlsPublicKey")
-	case r.AttestationStatement != nil && r.SshAttestationStatement != nil:
-		return trace.BadParameter("illegal to set both AttestationStatement and SshAttestationStatement")
-	case r.AttestationStatement != nil && r.TlsAttestationStatement != nil:
-		return trace.BadParameter("illegal to set both AttestationStatement and TlsAttestationStatement")
+	case authenticatedUserFlow && r.ConnectorSpec == nil:
+		return trace.BadParameter("ConnectorSpec cannot be nil for authenticated user")
+	case regularLoginFlow && r.ConnectorSpec != nil:
+		return trace.BadParameter("ConnectorSpec must be nil")
 	}
-	sshPubKey := r.PublicKey
-	if len(sshPubKey) == 0 {
-		sshPubKey = r.SshPublicKey
-	}
-	if len(sshPubKey) > 0 {
-		_, _, _, _, err := ssh.ParseAuthorizedKey(sshPubKey)
+	if len(r.SshPublicKey) > 0 {
+		_, _, _, _, err := ssh.ParseAuthorizedKey(r.SshPublicKey)
 		if err != nil {
 			return trace.BadParameter("bad SSH public key: %v", err)
 		}
 	}
-	if len(r.PublicKey)+len(r.SshPublicKey)+len(r.TlsPublicKey) > 0 &&
+	if (len(r.SshPublicKey) != 0 || len(r.TlsPublicKey) != 0) &&
 		(r.CertTTL > defaults.MaxCertDuration || r.CertTTL < defaults.MinCertDuration) {
 		return trace.BadParameter("wrong CertTTL")
 	}

@@ -44,6 +44,10 @@ func (f *UserFilter) Match(user *UserV2) bool {
 		}
 	}
 
+	if f.SkipSystemUsers && IsSystemResource(user) {
+		return false
+	}
+
 	return true
 }
 
@@ -59,8 +63,12 @@ type User interface {
 	GetOIDCIdentities() []ExternalIdentity
 	// GetSAMLIdentities returns a list of connected SAML identities
 	GetSAMLIdentities() []ExternalIdentity
+	// SetSAMLIdentities sets a list of connected SAML identities
+	SetSAMLIdentities([]ExternalIdentity)
 	// GetGithubIdentities returns a list of connected Github identities
 	GetGithubIdentities() []ExternalIdentity
+	// SetGithubIdentities sets the list of connected GitHub identities
+	SetGithubIdentities([]ExternalIdentity)
 	// Get local authentication secrets (may be nil).
 	GetLocalAuth() *LocalAuthSecrets
 	// Set local authentication secrets (use nil to delete).
@@ -121,6 +129,10 @@ type User interface {
 	SetHostUserUID(uid string)
 	// SetHostUserGID sets the GID for host users
 	SetHostUserGID(gid string)
+	// SetMCPTools sets a list of allowed MCP tools for the user
+	SetMCPTools(mcpTools []string)
+	// SetDefaultRelayAddr sets the trait for the default relay address.
+	SetDefaultRelayAddr(addr string)
 	// GetCreatedBy returns information about user
 	GetCreatedBy() CreatedBy
 	// SetCreatedBy sets created by information
@@ -154,6 +166,8 @@ type User interface {
 	SetWeakestDevice(MFADeviceKind)
 	// GetWeakestDevice gets the MFA state for the user.
 	GetWeakestDevice() MFADeviceKind
+	// Clone creats a copy of the user.
+	Clone() User
 }
 
 // NewUser creates new empty user
@@ -246,6 +260,7 @@ func (u *UserV2) SetStaticLabels(sl map[string]string) {
 // match against the list of search values.
 func (u *UserV2) MatchSearch(values []string) bool {
 	fieldVals := append(utils.MapToStrings(u.Metadata.Labels), u.GetName())
+	fieldVals = append(fieldVals, u.GetRoles()...)
 	return MatchSearch(fieldVals, values, nil)
 }
 
@@ -269,14 +284,15 @@ func (u *UserV2) SetName(e string) {
 	u.Metadata.Name = e
 }
 
+func (u *UserV2) Clone() User {
+	return utils.CloneProtoMsg(u)
+}
+
 // WithoutSecrets returns an instance of resource without secrets.
 func (u *UserV2) WithoutSecrets() Resource {
-	if u.Spec.LocalAuth == nil {
-		return u
-	}
-	u2 := *u
+	u2 := utils.CloneProtoMsg(u)
 	u2.Spec.LocalAuth = nil
-	return &u2
+	return u2
 }
 
 // GetTraits gets the trait map for this user used to populate role variables.
@@ -412,6 +428,23 @@ func (u *UserV2) SetHostUserGID(uid string) {
 	u.setTrait(constants.TraitHostUserGID, []string{uid})
 }
 
+// SetMCPTools sets a list of allowed MCP tools for the user
+func (u *UserV2) SetMCPTools(mcpTools []string) {
+	u.setTrait(constants.TraitMCPTools, mcpTools)
+}
+
+// SetDefaultRelayAddr implements [User].
+func (u *UserV2) SetDefaultRelayAddr(addr string) {
+	if addr == "" {
+		delete(u.Spec.Traits, constants.TraitDefaultRelayAddr)
+		return
+	}
+	if u.Spec.Traits == nil {
+		u.Spec.Traits = make(map[string][]string)
+	}
+	u.Spec.Traits[constants.TraitDefaultRelayAddr] = []string{addr}
+}
+
 // GetStatus returns login status of the user
 func (u *UserV2) GetStatus() LoginStatus {
 	return u.Spec.Status
@@ -427,9 +460,19 @@ func (u *UserV2) GetSAMLIdentities() []ExternalIdentity {
 	return u.Spec.SAMLIdentities
 }
 
+// SetSAMLIdentities sets a list of connected SAML identities
+func (u *UserV2) SetSAMLIdentities(identities []ExternalIdentity) {
+	u.Spec.SAMLIdentities = identities
+}
+
 // GetGithubIdentities returns a list of connected Github identities
 func (u *UserV2) GetGithubIdentities() []ExternalIdentity {
 	return u.Spec.GithubIdentities
+}
+
+// SetGithubIdentities sets the list of connected GitHub identities
+func (u *UserV2) SetGithubIdentities(identities []ExternalIdentity) {
+	u.Spec.GithubIdentities = identities
 }
 
 // GetLocalAuth gets local authentication secrets (may be nil).
@@ -511,11 +554,15 @@ func (u UserV2) GetGCPServiceAccounts() []string {
 
 // GetUserType indicates if the User was created by an SSO Provider or locally.
 func (u UserV2) GetUserType() UserType {
-	if u.GetCreatedBy().Connector == nil {
-		return UserTypeLocal
+	if u.GetCreatedBy().Connector != nil ||
+		len(u.GetOIDCIdentities()) > 0 ||
+		len(u.GetGithubIdentities()) > 0 ||
+		len(u.GetSAMLIdentities()) > 0 {
+
+		return UserTypeSSO
 	}
 
-	return UserTypeSSO
+	return UserTypeLocal
 }
 
 // IsBot returns true if the user is a bot.
@@ -600,4 +647,9 @@ func (i *ExternalIdentity) Check() error {
 		return trace.BadParameter("Username: missing username")
 	}
 	return nil
+}
+
+// IsEqual determines if two user group resources are equivalent to one another.
+func (i *ExternalIdentity) IsEqual(other *ExternalIdentity) bool {
+	return deriveTeleportEqualExternalIdentity(i, other)
 }

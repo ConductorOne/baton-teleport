@@ -36,6 +36,7 @@ type fullSyncTaskHandler struct {
 	externalResourceEntitlementIdFilter string
 	targetedSyncResources               []*v2.Resource
 	syncResourceTypeIDs                 []string
+	workerCount                         int
 }
 
 func (c *fullSyncTaskHandler) sync(ctx context.Context, c1zPath string) error {
@@ -51,6 +52,7 @@ func (c *fullSyncTaskHandler) sync(ctx context.Context, c1zPath string) error {
 	syncOpts := []sdkSync.SyncOpt{
 		sdkSync.WithC1ZPath(c1zPath),
 		sdkSync.WithTmpDir(c.helpers.TempDir()),
+		sdkSync.WithWorkerCount(c.workerCount),
 	}
 
 	if c.task.GetSyncFull().GetSkipExpandGrants() {
@@ -92,7 +94,7 @@ func (c *fullSyncTaskHandler) sync(ctx context.Context, c1zPath string) error {
 		syncOpts = append(syncOpts, sdkSync.WithSessionStore(setSessionStore))
 	}
 
-	syncer, err := sdkSync.NewSyncer(ctx, cc, syncOpts...)
+	syncer, err := sdkSync.NewSyncer(ctx, c.helpers.ConnectorClient(), syncOpts...)
 	if err != nil {
 		l.Error("failed to create syncer", zap.Error(err))
 		return err
@@ -162,7 +164,6 @@ func (c *fullSyncTaskHandler) HandleTask(ctx context.Context) error {
 		return c.helpers.FinishTask(ctx, nil, nil, err)
 	}
 
-	//nolint:gosec // c1zPath is created via os.CreateTemp above.
 	c1zF, err := os.Open(c1zPath)
 	if err != nil {
 		l.Error("failed to open sync asset prior to upload", zap.Error(err))
@@ -173,7 +174,7 @@ func (c *fullSyncTaskHandler) HandleTask(ctx context.Context) error {
 		if err != nil {
 			l.Error("failed to close sync asset", zap.Error(err), zap.String("path", f.Name()))
 		}
-		//nolint:gosec // removing the same temp file created/opened in this function.
+
 		err = os.Remove(f.Name())
 		if err != nil {
 			l.Error("failed to remove temp file", zap.Error(err), zap.String("path", f.Name()))
@@ -203,6 +204,7 @@ func newFullSyncTaskHandler(
 	externalResourceEntitlementIdFilter string,
 	targetedSyncResources []*v2.Resource,
 	syncResourceTypeIDs []string,
+	workerCount int,
 ) tasks.TaskHandler {
 	return &fullSyncTaskHandler{
 		task:                                task,
@@ -212,6 +214,7 @@ func newFullSyncTaskHandler(
 		externalResourceEntitlementIdFilter: externalResourceEntitlementIdFilter,
 		targetedSyncResources:               targetedSyncResources,
 		syncResourceTypeIDs:                 syncResourceTypeIDs,
+		workerCount:                         workerCount,
 	}
 }
 

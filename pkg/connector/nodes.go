@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
-	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
@@ -47,11 +46,12 @@ func getNodeResource(node *Node) (*v2.Resource, error) {
 }
 
 // List returns all the nodes from the database as resource objects.
-func (n *nodeBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+// Nodes include a NodeTrait because they are the 'shape' of a standard node.
+func (n *nodeBuilder) List(ctx context.Context, _ *v2.ResourceId, opts rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
 	var rv []*v2.Resource
-	resp, err := n.client.GetNodes(ctx, token)
+	resp, err := n.client.GetNodes(ctx, &pagination.Token{Token: opts.PageToken.Token})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, fmt.Errorf("baton-teleport: failed to list nodes: %w", err)
 	}
 
 	for _, nodeWrapper := range resp.GetResources() {
@@ -62,15 +62,15 @@ func (n *nodeBuilder) List(ctx context.Context, parentId *v2.ResourceId, token *
 			Namespace: node.GetNamespace(),
 		})
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, fmt.Errorf("baton-teleport: failed to create node resource: %w", err)
 		}
 		rv = append(rv, rr)
 	}
 
-	return rv, resp.NextKey, nil, nil
+	return rv, &rs.SyncOpResults{NextPageToken: resp.NextKey}, nil
 }
 
-func (r *nodeBuilder) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (r *nodeBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
 	return []*v2.Entitlement{
 		ent.NewAssignmentEntitlement(
 			resource,
@@ -79,7 +79,7 @@ func (r *nodeBuilder) Entitlements(ctx context.Context, resource *v2.Resource, t
 			ent.WithDisplayName(fmt.Sprintf("%s Node %s", resource.DisplayName, nodeMembership)),
 			ent.WithDescription(fmt.Sprintf("Member of %s Teleport node", resource.DisplayName)),
 		),
-	}, "", nil, nil
+	}, nil, nil
 }
 
 // TODO: This should return grants based on who has access to the node resource
@@ -88,7 +88,7 @@ func (r *nodeBuilder) Entitlements(ctx context.Context, resource *v2.Resource, t
 // a user needs to access any given node, and then return the grants for those resources
 // currently the GetAccessCapabilities should return these values, but is either erroring out
 // or returning and empty list, we need to figure out a way to make that function run properly.
-func (r *nodeBuilder) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+func (r *nodeBuilder) Grants(_ context.Context, _ *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
 	// nodes, err := r.client.ListResources(ctx, proto.ListResourcesRequest{
 	// 	ResourceType: types.KindNode,
 	// 	StartKey:     token.Token,
@@ -118,68 +118,7 @@ func (r *nodeBuilder) Grants(ctx context.Context, resource *v2.Resource, token *
 	// 	fmt.Println(fmt.Sprintf("user.GetTraits(): %+v", user.GetTraits())) // returns user's resources
 	// }
 
-	return nil, "", nil, nil
-}
-
-// TODO: these should either grant/revoke access to a node, or we shouldn't implement them
-// ISSUE: we need a way to associate nodes and roles.
-func (r *nodeBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
-	// l := ctxzap.Extract(ctx)
-	// userName := principal.Id.Resource
-	// roleName := entitlement.Resource.Id.Resource
-	//
-	// if principal.Id.ResourceType != userResourceType.Id {
-	// 	l.Warn(
-	// 		"baton-segment: only users can be granted role membership",
-	// 		zap.String("principal_type", principal.Id.ResourceType),
-	// 		zap.String("principal_id", principal.Id.Resource),
-	// 	)
-	// 	return nil, fmt.Errorf("baton-segment: only users can be granted group membership")
-	// }
-	//
-	// // TODO: check if node can be accessed with given entitlement
-	//
-	// //
-	//
-	// // Create an MFA required role for "prod" nodes.
-	// prodRole, err := types.NewRole(roleName, types.RoleSpecV6{
-	// 	Options: types.RoleOptions{
-	// 		RequireMFAType: types.RequireMFAType_SESSION,
-	// 	},
-	// 	Allow: types.RoleConditions{
-	// 		Logins:     []string{userName},
-	// 		NodeLabels: types.Labels{},
-	// 	},
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//
-	// user, err := r.client.GetUser(ctx, userName, false)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//
-	// user.SetLogins(append(user.GetLogins(), userName))
-	// user.AddRole(prodRole.GetName())
-	// updatedUser, err := r.client.UpdateUser(ctx, user.(*types.UserV2))
-	// if err != nil {
-	// 	return nil, fmt.Errorf("teleport-connector: failed to add role: %s", err.Error())
-	// }
-	//
-	// l.Warn("Role Membership has been created.",
-	// 	zap.String("Name", updatedUser.GetName()),
-	// 	zap.String("Namespace", updatedUser.GetMetadata().Namespace),
-	// 	zap.Time("CreatedAt", updatedUser.GetCreatedBy().Time),
-	// 	)
-	//
-	return nil, nil
-}
-
-// TODO:
-// ISSUE: we need a way to associate nodes and roles.
-func (r *nodeBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
-	return nil, nil
+	return nil, nil, nil
 }
 
 func newNodeBuilder(c *client.TeleportClient) *nodeBuilder {

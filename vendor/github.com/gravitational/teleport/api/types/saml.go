@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"time"
@@ -114,6 +115,18 @@ type SAMLConnector interface {
 	WithMFASettings() error
 	// GetForceAuthn returns ForceAuthn
 	GetForceAuthn() bool
+	// GetPreferredRequestBinding returns PreferredRequestBinding.
+	GetPreferredRequestBinding() string
+	// GetUserMatchers returns the set of glob patterns to narrow down which username(s) this auth connector should
+	// match for identifier-first login.
+	GetUserMatchers() []string
+	// SetUserMatchers sets the set of glob patterns to narrow down which username(s) this auth connector should match
+	// for identifier-first login.
+	SetUserMatchers([]string)
+	// GetIncludeSubject returns true if the Subject element should be included in the AuthnRequest.
+	GetIncludeSubject() bool
+	// SetIncludeSubject sets whether the Subject element should be included.
+	SetIncludeSubject(bool)
 }
 
 // NewSAMLConnector returns a new SAMLConnector based off a name and SAMLConnectorSpecV2.
@@ -445,6 +458,44 @@ func (o *SAMLConnectorV2) GetForceAuthn() bool {
 	return o.Spec.ForceAuthn == SAMLForceAuthn_FORCE_AUTHN_YES
 }
 
+// GetUserMatchers returns the set of glob patterns to narrow down which username(s) this auth connector should
+// match for identifier-first login.
+func (r *SAMLConnectorV2) GetUserMatchers() []string {
+	if r.Spec.UserMatchers == nil {
+		return nil
+	}
+	return r.Spec.UserMatchers
+}
+
+// SetUserMatchers sets the set of glob patterns to narrow down which username(s) this auth connector should match
+// for identifier-first login.
+func (r *SAMLConnectorV2) SetUserMatchers(userMatchers []string) {
+	r.Spec.UserMatchers = userMatchers
+}
+
+func (r *SAMLConnectorV2) GetIncludeSubject() bool {
+	return r.Spec.IncludeSubject
+}
+
+func (r *SAMLConnectorV2) SetIncludeSubject(includeSubject bool) {
+	r.Spec.IncludeSubject = includeSubject
+}
+
+const (
+	// SAMLRequestHTTPRedirectBinding is the SAML http-redirect binding request name.
+	SAMLRequestHTTPRedirectBinding = "http-redirect"
+	// SAMLRequestHTTPPostBinding is the SAML http-post binding request name.
+	SAMLRequestHTTPPostBinding = "http-post"
+)
+
+// SAMLRequestBindingValues includes supported SAML request binding values.
+var SAMLRequestBindingValues = []string{SAMLRequestHTTPRedirectBinding, SAMLRequestHTTPPostBinding}
+
+// GetPreferredRequestBinding returns PreferredRequestBinding.
+func (o *SAMLConnectorV2) GetPreferredRequestBinding() string {
+	return o.Spec.PreferredRequestBinding
+}
+
 // setStaticFields sets static resource header and metadata fields.
 func (o *SAMLConnectorV2) setStaticFields() {
 	o.Kind = KindSAMLConnector
@@ -486,6 +537,7 @@ func (o *SAMLConnectorV2) CheckAndSetDefaults() error {
 			return trace.BadParameter("need roles field in attributes_to_roles")
 		}
 	}
+
 	return nil
 }
 
@@ -499,28 +551,130 @@ func (r *SAMLAuthRequest) Check() error {
 		return trace.BadParameter("ConnectorSpec cannot be nil when SSOTestFlow is true")
 	case !r.SSOTestFlow && r.ConnectorSpec != nil:
 		return trace.BadParameter("ConnectorSpec must be nil when SSOTestFlow is false")
-	case len(r.PublicKey) != 0 && len(r.SshPublicKey) != 0:
-		return trace.BadParameter("illegal to set both PublicKey and SshPublicKey")
-	case len(r.PublicKey) != 0 && len(r.TlsPublicKey) != 0:
-		return trace.BadParameter("illegal to set both PublicKey and TlsPublicKey")
-	case r.AttestationStatement != nil && r.SshAttestationStatement != nil:
-		return trace.BadParameter("illegal to set both AttestationStatement and SshAttestationStatement")
-	case r.AttestationStatement != nil && r.TlsAttestationStatement != nil:
-		return trace.BadParameter("illegal to set both AttestationStatement and TlsAttestationStatement")
 	}
-	sshPubKey := r.PublicKey
-	if len(sshPubKey) == 0 {
-		sshPubKey = r.SshPublicKey
-	}
-	if len(sshPubKey) > 0 {
-		_, _, _, _, err := ssh.ParseAuthorizedKey(sshPubKey)
+	if len(r.SshPublicKey) > 0 {
+		_, _, _, _, err := ssh.ParseAuthorizedKey(r.SshPublicKey)
 		if err != nil {
 			return trace.BadParameter("bad SSH public key: %v", err)
 		}
 	}
-	if len(r.PublicKey)+len(r.SshPublicKey)+len(r.TlsPublicKey) > 0 &&
+	if (len(r.SshPublicKey) != 0 || len(r.TlsPublicKey) != 0) &&
 		(r.CertTTL > defaults.MaxCertDuration || r.CertTTL < defaults.MinCertDuration) {
 		return trace.BadParameter("wrong CertTTL")
 	}
 	return nil
+}
+
+// MarshalJSON marshals SAMLForceAuthn to string.
+func (s SAMLForceAuthn) MarshalYAML() (interface{}, error) {
+	val, err := s.encode()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return val, nil
+}
+
+// UnmarshalYAML supports parsing SAMLForceAuthn from string.
+func (s *SAMLForceAuthn) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var val any
+	if err := unmarshal(&val); err != nil {
+		return trace.Wrap(err)
+	}
+	return trace.Wrap(s.decode(val))
+}
+
+// MarshalJSON marshals SAMLForceAuthn to string.
+func (s SAMLForceAuthn) MarshalJSON() ([]byte, error) {
+	val, err := s.encode()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	out, err := json.Marshal(val)
+	return out, trace.Wrap(err)
+}
+
+// UnmarshalJSON supports parsing SAMLForceAuthn from string.
+func (s *SAMLForceAuthn) UnmarshalJSON(data []byte) error {
+	var val any
+	if err := json.Unmarshal(data, &val); err != nil {
+		return trace.Wrap(err)
+	}
+	return trace.Wrap(s.decode(val))
+}
+
+func (s *SAMLForceAuthn) encode() (string, error) {
+	switch *s {
+	case SAMLForceAuthn_FORCE_AUTHN_UNSPECIFIED:
+		return "", nil
+	case SAMLForceAuthn_FORCE_AUTHN_NO:
+		return "no", nil
+	case SAMLForceAuthn_FORCE_AUTHN_YES:
+		return "yes", nil
+	default:
+		return "", trace.BadParameter("SAMLForceAuthn invalid value %v", *s)
+	}
+}
+
+func (s *SAMLForceAuthn) decode(val any) error {
+	switch v := val.(type) {
+	case string:
+		// try parsing as a boolean
+		switch strings.ToLower(v) {
+		case "":
+			*s = SAMLForceAuthn_FORCE_AUTHN_UNSPECIFIED
+		case "yes", "yeah", "y", "true", "1", "on":
+			*s = SAMLForceAuthn_FORCE_AUTHN_YES
+		case "no", "nope", "n", "false", "0", "off":
+			*s = SAMLForceAuthn_FORCE_AUTHN_NO
+		default:
+			return trace.BadParameter("SAMLForceAuthn invalid value %v", val)
+		}
+	case bool:
+		if v {
+			*s = SAMLForceAuthn_FORCE_AUTHN_YES
+		} else {
+			*s = SAMLForceAuthn_FORCE_AUTHN_NO
+		}
+	case int32:
+		return trace.Wrap(s.setFromEnum(v))
+	case int64:
+		return trace.Wrap(s.setFromEnum(int32(v)))
+	case int:
+		return trace.Wrap(s.setFromEnum(int32(v)))
+	case float64:
+		return trace.Wrap(s.setFromEnum(int32(v)))
+	case float32:
+		return trace.Wrap(s.setFromEnum(int32(v)))
+	default:
+		return trace.BadParameter("SAMLForceAuthn invalid type %T", val)
+	}
+	return nil
+}
+
+// setFromEnum sets the value from enum value as int32.
+func (s *SAMLForceAuthn) setFromEnum(val int32) error {
+	if _, ok := SAMLForceAuthn_name[val]; !ok {
+		return trace.BadParameter("invalid SAMLForceAuthn enum %v", val)
+	}
+	*s = SAMLForceAuthn(val)
+	return nil
+}
+
+// SAMLConnectorValidationOptions are options for SAML connector validation.
+type SAMLConnectorValidationOptions struct {
+	// NoFollowURLs disables following of URLs to populate SAML connector
+	// metadata. Useful when full metadata is not necessary, especially for
+	// endpoints like /webapi/ping which must not hang or fail.
+	NoFollowURLs bool
+}
+
+// SAMLConnectorValidationOption is an option for validation of SAML connectors.
+type SAMLConnectorValidationOption func(*SAMLConnectorValidationOptions)
+
+// SAMLConnectorValidationFollowURLs returns a SAMLConnectorValidationOptions
+// that sets whether URLs should be followed while validating the connector.
+func SAMLConnectorValidationFollowURLs(follow bool) SAMLConnectorValidationOption {
+	return func(opts *SAMLConnectorValidationOptions) {
+		opts.NoFollowURLs = !follow
+	}
 }

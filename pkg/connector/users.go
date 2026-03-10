@@ -8,7 +8,6 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/conductorone/baton-teleport/pkg/client"
 	"github.com/gravitational/teleport/api/client/proto"
@@ -48,6 +47,7 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 		"last_name":  lastName,
 	}
 
+	// Teleport does not store an email natively for users.
 	if accountType == v2.UserTrait_ACCOUNT_TYPE_HUMAN {
 		profile["email"] = name
 	}
@@ -71,7 +71,6 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 	if accountType == v2.UserTrait_ACCOUNT_TYPE_HUMAN {
 		opts = append(opts, resource.WithEmail(name, true))
 	}
-
 	return resource.NewUserResource(
 		name,
 		userResourceType,
@@ -181,7 +180,7 @@ func (u *userBuilder) Get(ctx context.Context, resourceId *v2.ResourceId, parent
 	return r, nil, nil
 }
 
-func (u *userBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId) (annotations.Annotations, error) {
+func (u *userBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId, _ *v2.ResourceId) (annotations.Annotations, error) {
 	username := resourceID.GetResource()
 	if username == "" {
 		return nil, fmt.Errorf("missing resource name")
@@ -206,34 +205,34 @@ func (u *userBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId) (an
 
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
-func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, _ resource.SyncOpAttrs) ([]*v2.Resource, *resource.SyncOpResults, error) {
 	var rv []*v2.Resource
 	users, err := u.client.GetUsers(ctx, false)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	for _, user := range users {
 		userCopy := user
 		ur, err := userResource(parentResourceID, userCopy)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 
 		rv = append(rv, ur)
 	}
 
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
 // Entitlements always returns an empty slice for users.
-func (o *userBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (o *userBuilder) Entitlements(_ context.Context, _ *v2.Resource, _ resource.SyncOpAttrs) ([]*v2.Entitlement, *resource.SyncOpResults, error) {
+	return nil, nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
-func (o *userBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (o *userBuilder) Grants(_ context.Context, _ *v2.Resource, _ resource.SyncOpAttrs) ([]*v2.Grant, *resource.SyncOpResults, error) {
+	return nil, nil, nil
 }
 
 func newUserBuilder(c *client.TeleportClient) *userBuilder {
