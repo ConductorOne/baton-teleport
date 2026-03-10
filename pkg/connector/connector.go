@@ -68,15 +68,17 @@ func (d *Connector) Metadata(_ context.Context) (*v2.ConnectorMetadata, error) {
 }
 
 func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, error) {
-	_, err := d.client.Ping(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("baton-teleport: failed to validate connection: %w", err)
+	if d.client != nil {
+		_, err := d.client.Ping(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("baton-teleport: failed to validate connection: %w", err)
+		}
 	}
 	return nil, nil
 }
 
 func (d *Connector) Close() error {
-	if d.client != nil {
+	if d.client != nil && d.client.Client != nil {
 		return d.client.Close()
 	}
 	return nil
