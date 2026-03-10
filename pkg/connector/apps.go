@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
-	"github.com/conductorone/baton-sdk/pkg/annotations"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/gravitational/teleport/api/types"
 
@@ -77,14 +76,6 @@ func (a *appBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs
 
 func (a *appBuilder) Grants(_ context.Context, _ *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
 	return nil, nil, nil
-}
-
-func (a *appBuilder) Grant(_ context.Context, _ *v2.Resource, _ *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
-	return nil, nil, nil
-}
-
-func (a *appBuilder) Revoke(_ context.Context, _ *v2.Grant) (annotations.Annotations, error) {
-	return nil, nil
 }
 
 func newAppBuilder(c *client.TeleportClient) *appBuilder {

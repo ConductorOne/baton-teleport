@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
-	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
@@ -120,67 +119,6 @@ func (r *nodeBuilder) Grants(_ context.Context, _ *v2.Resource, _ rs.SyncOpAttrs
 	// }
 
 	return nil, nil, nil
-}
-
-// TODO: these should either grant/revoke access to a node, or we shouldn't implement them
-// ISSUE: we need a way to associate nodes and roles.
-func (r *nodeBuilder) Grant(_ context.Context, _ *v2.Resource, _ *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
-	// l := ctxzap.Extract(ctx)
-	// userName := principal.Id.Resource
-	// roleName := entitlement.Resource.Id.Resource
-	//
-	// if principal.Id.ResourceType != userResourceType.Id {
-	// 	l.Warn(
-	// 		"baton-segment: only users can be granted role membership",
-	// 		zap.String("principal_type", principal.Id.ResourceType),
-	// 		zap.String("principal_id", principal.Id.Resource),
-	// 	)
-	// 	return nil, fmt.Errorf("baton-segment: only users can be granted group membership")
-	// }
-	//
-	// // TODO: check if node can be accessed with given entitlement
-	//
-	// //
-	//
-	// // Create an MFA required role for "prod" nodes.
-	// prodRole, err := types.NewRole(roleName, types.RoleSpecV6{
-	// 	Options: types.RoleOptions{
-	// 		RequireMFAType: types.RequireMFAType_SESSION,
-	// 	},
-	// 	Allow: types.RoleConditions{
-	// 		Logins:     []string{userName},
-	// 		NodeLabels: types.Labels{},
-	// 	},
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//
-	// user, err := r.client.GetUser(ctx, userName, false)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//
-	// user.SetLogins(append(user.GetLogins(), userName))
-	// user.AddRole(prodRole.GetName())
-	// updatedUser, err := r.client.UpdateUser(ctx, user.(*types.UserV2))
-	// if err != nil {
-	// 	return nil, fmt.Errorf("teleport-connector: failed to add role: %s", err.Error())
-	// }
-	//
-	// l.Warn("Role Membership has been created.",
-	// 	zap.String("Name", updatedUser.GetName()),
-	// 	zap.String("Namespace", updatedUser.GetMetadata().Namespace),
-	// 	zap.Time("CreatedAt", updatedUser.GetCreatedBy().Time),
-	// 	)
-	//
-	return nil, nil, nil
-}
-
-// TODO:
-// ISSUE: we need a way to associate nodes and roles.
-func (r *nodeBuilder) Revoke(_ context.Context, _ *v2.Grant) (annotations.Annotations, error) {
-	return nil, nil
 }
 
 func newNodeBuilder(c *client.TeleportClient) *nodeBuilder {
