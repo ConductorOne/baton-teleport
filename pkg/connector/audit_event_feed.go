@@ -243,8 +243,28 @@ func convertAuditEvent(auditEvent events.AuditEvent) ([]*v2.Event, time.Time) {
 }
 
 // convertUserEvent handles both *events.UserCreate and *events.UserUpdate.
-// Both carry the complete role list in their Roles field. We emit a
-// ResourceChangeEvent for the user plus a CreateGrantEvent per role.
+// Both carry the complete role list in their Roles field (the post-update
+// state). We emit a ResourceChangeEvent for the user plus a CreateGrantEvent
+// per role currently assigned.
+//
+// Role-change semantics on user.update:
+//   - Role ADDED (e.g. [A, B] → [A, B, C]): C1 receives a CreateGrantEvent
+//     for every current role, including the new C → incremental sync picks
+//     up the addition immediately. Grants for A and B are no-ops on C1's
+//     side (they already exist).
+//   - Role REMOVED (e.g. [A, B, C] → [A, B]): Teleport's user.update payload
+//     only contains the POST-update roles [A, B]. There is no reliable field
+//     that identifies which role was removed: `user_roles` on the event's
+//     UserMetadata refers to the ACTOR's roles (who performed the update),
+//     not the target user's previous roles, so it cannot be used to compute
+//     a diff in the common case where an admin edits a different user.
+//     Consequently, role removals are NOT emitted as CreateRevokeEvents —
+//     they are reconciled during the next full sync cycle.
+//   - Roles UNCHANGED: redundant CreateGrantEvents are emitted; C1 dedupes.
+//
+// If a future Teleport release adds an authoritative "previous roles of the
+// target user" field to user.update events, we can compute the diff here
+// and emit CreateRevokeEvents for removed roles.
 func convertUserEvent(id string, t time.Time, userName string, roles []string) ([]*v2.Event, time.Time) {
 	if userName == "" {
 		return nil, time.Time{}
