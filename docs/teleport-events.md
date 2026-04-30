@@ -93,6 +93,20 @@ Both feeds use `SearchEvents` with `EventOrderAscending` and share a common pagi
 - `CreateGrantEvent`s are idempotent — C1 deduplicates already-existing grants, and any newly added role is picked up immediately.
 - Empty role names in the `Roles` slice are skipped.
 
+**Limitation — role-membership revocations are not emitted incrementally:**
+
+When a role is **removed** from a user (e.g. roles go from `[A, B, C]` to `[A, B]`), the connector does **not** emit a `CreateRevokeEvent` for the removed role. The removed role-membership grant remains visible in ConductorOne until the next full sync reconciles it.
+
+Why:
+- Teleport's `user.update` audit payload only carries the **post-update** role list (`Roles` field). It does not include the previous role list for the target user.
+- The event's `UserMetadata.user_roles` field looks tempting but is unreliable: it represents the **actor's** roles (the user who performed the update), not the target user's previous roles. In the common case where an admin edits a different user, `user_roles` is the admin's roles and using it for a diff would emit nonsense revokes.
+- Without a reliable "previous roles" signal, the connector cannot identify which role-membership was removed, so it skips revoke emission entirely and lets the next full-sync cycle reconcile the state.
+
+What this means in practice:
+- **Role additions** propagate immediately via `CreateGrantEvent`.
+- **Role removals** are visible only after the next full sync (typically minutes to hours, depending on the sync schedule).
+- Profile changes (status, email, locks) propagate immediately via `ResourceChangeEvent`.
+
 > **Live API verification (2026-02-27):** `CreateUser()` fires `user.create` (`*events.UserCreate`), `UpdateUser()` fires `user.update` (`*events.UserUpdate`). These are **separate** event types, not upsert semantics.
 
 ---
@@ -120,54 +134,6 @@ Both feeds use `SearchEvents` with `EventOrderAscending` and share a common pagi
 | Guard | Skipped if `ResourceMetadata.Name` is empty |
 
 > **Live API verification (2026-02-27):** Role modifications fire a separate `role.updated` event (code T9002I, Go type `*events.RoleUpdate`), distinct from the `role.created` event.
-
----
-
-### App Events
-
-> **Excluded from event feed.** `app.create` and `app.update` are not handled. `List()` uses `Metadata.Revision` as the app resource ID, but audit events only carry the resource name — C1 cannot correlate the event to an existing resource. Apps are reconciled during the next full sync. A follow-up ticket will evaluate switching to `Name` as the stable resource ID.
-
-#### `app.create`
-
-| Field | Value |
-|-------|-------|
-| Teleport event string | `app.create` |
-| Go type | `*events.AppCreate` |
-| When fired | Application resource is created |
-| C1 events emitted | None — excluded (see above) |
-
-#### `app.update`
-
-| Field | Value |
-|-------|-------|
-| Teleport event string | `app.update` |
-| Go type | `*events.AppUpdate` |
-| When fired | Application resource is modified |
-| C1 events emitted | None — excluded (see above) |
-
----
-
-### Database Events
-
-> **Excluded from event feed.** `db.create` and `db.update` are not handled. Same rationale as apps — `List()` uses `Revision` as resource ID but audit events carry the name. Databases are reconciled during the next full sync.
-
-#### `db.create`
-
-| Field | Value |
-|-------|-------|
-| Teleport event string | `db.create` |
-| Go type | `*events.DatabaseCreate` |
-| When fired | Database resource is created |
-| C1 events emitted | None — excluded (see above) |
-
-#### `db.update`
-
-| Field | Value |
-|-------|-------|
-| Teleport event string | `db.update` |
-| Go type | `*events.DatabaseUpdate` |
-| When fired | Database resource is modified |
-| C1 events emitted | None — excluded (see above) |
 
 ---
 
@@ -278,6 +244,19 @@ Resource delete events (`user.delete`, `role.deleted`, `app.delete`, `db.delete`
 
 `access_request.create` (submission, `PENDING` state) is **intentionally excluded**. At submission time no access has been granted yet — the request is just pending. There is nothing new for C1 to discover via resync.
 
+### App and Database Events
+
+`app.create`, `app.update`, `db.create`, and `db.update` are **intentionally excluded** from the event feed.
+
+**Reason:** `List()` uses `Metadata.Revision` as the resource ID for apps and databases, but audit events only carry the resource **name** — C1 cannot correlate the event to an existing resource. Apps and databases are reconciled during the next full sync. A follow-up ticket will evaluate switching to `Name` as the stable resource ID, which would unblock incremental sync for these resource types.
+
+| Go Type | Teleport event string |
+|---------|----------------------|
+| `*events.AppCreate` | `app.create` |
+| `*events.AppUpdate` | `app.update` |
+| `*events.DatabaseCreate` | `db.create` |
+| `*events.DatabaseUpdate` | `db.update` |
+
 ### Other Excluded Events
 
 | Go Type | Reason |
@@ -293,7 +272,7 @@ Resource delete events (`user.delete`, `role.deleted`, `app.delete`, `db.delete`
 | Teleport Event | C1 ResourceChangeEvent | C1 CreateGrantEvent | C1 CreateRevokeEvent | Notes |
 |---------------|----------------------|-------------------|---------------------|-------|
 | `user.create` | User | Per role in `Roles[]` | — | Initial user creation |
-| `user.update` | User | Per role in `Roles[]` | — | User modification |
+| `user.update` | User | Per role in `Roles[]` | — | User modification — role **removals** are not emitted; reconciled by full sync ([details](#userupdate)) |
 | `role.created` | Role | — | — | Role creation |
 | `role.updated` | Role | — | — | Role modification (code T9002I) |
 | ~~`app.create`~~ | — | — | — | **Not handled** — ID mismatch (Revision vs Name) |
