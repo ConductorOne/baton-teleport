@@ -53,7 +53,7 @@ baton resources
 ## Docker
 
 ```
-docker run --rm -v $(pwd):/out -e BATON_PROXYADDR=clientProxy ghcr.io/conductorone/baton-teleport:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out -e BATON_PROXYADDR=clientProxy public.ecr.aws/conductorone/baton-teleport:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
