@@ -1,8 +1,6 @@
 module github.com/conductorone/baton-teleport
 
-go 1.26.0
-
-toolchain go1.26.9
+go 1.27.3
 
 require (
 	github.com/conductorone/baton-sdk v0.8.4
@@ -45,7 +43,7 @@ require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/charlievieth/strcase v0.0.5 // indirect
+	github.com/charlievieth/strcase v0.0.6 // indirect
 	github.com/conductorone/dpop v0.2.3 // indirect
 	github.com/conductorone/dpop/integrations/dpop_grpc v0.2.3 // indirect
 	github.com/conductorone/dpop/integrations/dpop_oauth2 v0.2.3 // indirect
