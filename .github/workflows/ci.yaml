@@ -30,7 +30,9 @@ jobs:
       - name: Fetch Teleport binaries
         uses: teleport-actions/setup@v1
         with:
-          version: 18.2.0
+          # Install the version the test cluster runs instead of pinning one.
+          version: auto
+          proxy: ${{ secrets.PROXY }}
 
       - name: Fetch credentials using Machine ID
         id: auth
