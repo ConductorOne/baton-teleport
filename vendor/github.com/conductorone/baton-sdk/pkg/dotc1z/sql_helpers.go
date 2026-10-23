@@ -18,13 +18,72 @@ import (
 
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorstore"
+	"github.com/conductorone/baton-sdk/pkg/dotc1z/c1zstore"
+	"github.com/conductorone/baton-sdk/pkg/uotel"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 )
 
 const bulkPutParallelThreshold = 100
-const insertChunkSize = 200
+const insertChunkSize = 1000
 const maxPageSize = 10000
+
+// sqliteTimeFormat is the layout every timestamp column in a v1 c1z is written
+// in: started_at / ended_at on sync_runs, discovered_at on the record tables and
+// assets. The value is local wall-clock with no zone suffix.
+//
+// Any SQL predicate on one of those columns must render its bound with this
+// layout, in local time. The columns hold TEXT and SQLite compares them
+// bytewise, so a bound in another shape silently compares wrong — binding a
+// time.Time makes goqu emit RFC3339Nano in UTC, whose 'T' separator sorts above
+// this layout's space and made every same-date row look older than the bound.
+const sqliteTimeFormat = "2006-01-02 15:04:05.999999999"
+
+// localizeSQLiteTimestamp reinterprets a timestamp scanned out of a v1 c1z as a
+// wall clock in loc, which for production callers is time.Local.
+//
+// The writers Format in local time with no zone suffix, and the driver parses
+// that layout with time.Parse, which assumes UTC (modernc only uses
+// ParseInLocation when the _timezone DSN param is set, and it is not). A scanned
+// value therefore carries the right wall clock in the wrong location: an instant
+// off by the writing host's UTC offset.
+//
+// Reading a column and writing it back as text is unaffected, wall clock in and
+// wall clock out, which is why the SQLite-only paths stay self-consistent. But
+// anything that turns the value into an absolute instant has to fix the location
+// first, because the comparisons downstream are real time comparisons: Pebble
+// checks started_at against time.Now() for the resume cutoff, and compaction
+// picks record winners by newest discovered_at.
+//
+// A value that came back with a real zone (a zone-ful layout, or a future
+// _timezone DSN) is already unambiguous and is left alone, as is a zero time so
+// callers can keep treating it as unset.
+//
+// The result is exact except across a DST transition, where a zone-less wall
+// clock is genuinely ambiguous and no reading of the stored text can recover the
+// instant: a fall-back hour names two instants and Go leaves the choice
+// unspecified, and a spring-forward hour names none and normalizes to a shifted
+// instant. Values written in such an hour can therefore be up to an hour off,
+// which for discovered_at means a cross-file compaction tiebreak can order them
+// wrong against a Pebble-native record. Fixing that would require storing the
+// zone.
+func localizeSQLiteTimestamp(t time.Time, loc *time.Location) time.Time {
+	if t.IsZero() || t.Location() != time.UTC {
+		return t
+	}
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), loc)
+}
+
+// localizeSQLiteTimestampPtr localizes an optional column, keeping nil as nil so
+// "never set" survives, and returning a new pointer so the caller's value is
+// left alone.
+func localizeSQLiteTimestampPtr(t *time.Time, loc *time.Location) *time.Time {
+	if t == nil {
+		return nil
+	}
+	localized := localizeSQLiteTimestamp(*t, loc)
+	return &localized
+}
 
 // Use worker pool to limit goroutines.
 var numWorkers = min(max(runtime.GOMAXPROCS(0), 1), 4)
@@ -43,7 +102,8 @@ type tableDescriptor interface {
 	Name() string
 	Schema() (string, []any)
 	Version() string
-	Migrations(ctx context.Context, db *goqu.Database) error
+	// Returns true if the any migrations were run, false otherwise.
+	Migrations(ctx context.Context, db *goqu.Database) (bool, error)
 }
 
 type listRequest interface {
@@ -143,9 +203,10 @@ func resolveSyncID(ctx context.Context, c *C1File, req listRequest) (string, err
 // It returns a slice of typed proto messages constructed via the provided factory function.
 func listConnectorObjects[T proto.Message](ctx context.Context, c *C1File, tableName string, req listRequest, factory func() T) ([]T, string, error) {
 	ctx, span := tracer.Start(ctx, "C1File.listConnectorObjects")
-	defer span.End()
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 
-	err := c.validateDb(ctx)
+	err = c.validateDb(ctx)
 	if err != nil {
 		return nil, "", err
 	}
@@ -291,7 +352,8 @@ func listConnectorObjects[T proto.Message](ctx context.Context, c *C1File, table
 	return ret, nextPageToken, nil
 }
 
-// This is required for sync diffs to work.  Its not much slower.
+// Deterministic marshaling keeps stored blobs byte-comparable across
+// writes (compaction change detection, digests). Its not much slower.
 var protoMarshaler = proto.MarshalOptions{Deterministic: true}
 
 // prepareSingleConnectorObjectRow processes a single message and returns the prepared record.
@@ -328,7 +390,7 @@ func prepareSingleConnectorObjectRow[T proto.Message](
 		fields["data"] = messageBlob
 	}
 	fields["sync_id"] = c.currentSyncID
-	fields["discovered_at"] = time.Now().Format("2006-01-02 15:04:05.999999999")
+	fields["discovered_at"] = time.Now().Format(sqliteTimeFormat)
 
 	return &fields, nil
 }
@@ -363,7 +425,8 @@ func prepareConnectorObjectRowsParallel[T proto.Message](
 
 	protoMarshallers := make([]proto.MarshalOptions, numWorkers)
 	for i := range numWorkers {
-		// Deterministic marshaling is required for sync diffs to work.  Its not much slower.
+		// Deterministic marshaling keeps stored blobs byte-comparable
+		// across writes.  Its not much slower.
 		protoMarshallers[i] = proto.MarshalOptions{Deterministic: true}
 	}
 
@@ -372,7 +435,7 @@ func prepareConnectorObjectRowsParallel[T proto.Message](
 
 	// Capture values that are the same for all rows (avoid repeated access)
 	syncID := c.currentSyncID
-	discoveredAt := time.Now().Format("2006-01-02 15:04:05.999999999")
+	discoveredAt := time.Now().Format(sqliteTimeFormat)
 
 	chunkSize := (len(msgs) + numWorkers - 1) / numWorkers
 
@@ -522,9 +585,10 @@ func bulkPutConnectorObject[T proto.Message](
 		return nil
 	}
 	ctx, span := tracer.Start(ctx, "C1File.bulkPutConnectorObject")
-	defer span.End()
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 
-	err := c.validateSyncDb(ctx)
+	err = c.validateSyncDb(ctx)
 	if err != nil {
 		return err
 	}
@@ -547,51 +611,10 @@ func bulkPutConnectorObject[T proto.Message](
 	return executeChunkedInsert(ctx, c, tableName, rows, buildQueryFn)
 }
 
-func bulkPutConnectorObjectIfNewer[T proto.Message](
-	ctx context.Context, c *C1File,
-	tableName string,
-	extractFields func(m T) (goqu.Record, error),
-	msgs ...T,
-) error {
-	if len(msgs) == 0 {
-		return nil
-	}
-	ctx, span := tracer.Start(ctx, "C1File.bulkPutConnectorObjectIfNewer")
-	defer span.End()
-
-	err := c.validateSyncDb(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Prepare rows
-	rows, err := prepareConnectorObjectRows(c, msgs, extractFields)
-	if err != nil {
-		return err
-	}
-
-	// Define query building function
-	buildQueryFn := func(insertDs *goqu.InsertDataset, chunkedRows []*goqu.Record) (*goqu.InsertDataset, error) {
-		return insertDs.
-			OnConflict(goqu.DoUpdate("external_id, sync_id",
-				goqu.Record{
-					"data":          goqu.I("EXCLUDED.data"),
-					"discovered_at": goqu.I("EXCLUDED.discovered_at"),
-				}).Where(
-				goqu.L("EXCLUDED.discovered_at > ?.discovered_at", goqu.I(tableName)),
-			)).
-			Rows(chunkedRows).
-			Prepared(true), nil
-	}
-
-	// Execute the insert
-	return executeChunkedInsert(ctx, c, tableName, rows, buildQueryFn)
-}
-
 func (c *C1File) getResourceObject(ctx context.Context, resourceID *v2.ResourceId, m *v2.Resource, syncID string) error {
-	ctx, span := tracer.Start(ctx, "C1File.getResourceObject")
-	defer span.End()
-
+	// No span here: this function is always called from C1File.GetResource
+	// which already owns a span. The duplicate emitted one span per
+	// resource-fetch and was a top contributor to mega-trace span counts.
 	err := c.validateDb(ctx)
 	if err != nil {
 		return err
@@ -610,7 +633,7 @@ func (c *C1File) getResourceObject(ctx context.Context, resourceID *v2.ResourceI
 	case c.viewSyncID != "":
 		q = q.Where(goqu.C("sync_id").Eq(c.viewSyncID))
 	default:
-		var latestSyncRun *syncRun
+		var latestSyncRun *c1zstore.SyncRun
 		var err error
 		latestSyncRun, err = c.getFinishedSync(ctx, 0, connectorstore.SyncTypeFull)
 		if err != nil {
@@ -638,7 +661,7 @@ func (c *C1File) getResourceObject(ctx context.Context, resourceID *v2.ResourceI
 	row := c.db.QueryRowContext(ctx, query, args...)
 	err = row.Scan(&data)
 	if err != nil {
-		return err
+		return c1zstore.AdaptNotFound(err)
 	}
 
 	err = proto.Unmarshal(data, m)
@@ -649,10 +672,10 @@ func (c *C1File) getResourceObject(ctx context.Context, resourceID *v2.ResourceI
 	return nil
 }
 
+// No span here: every call site (C1File.GetResourceType, GetEntitlement,
+// GetGrant) already owns a span. The duplicate emitted one span per
+// per-resource lookup and was a top contributor to mega-trace span counts.
 func (c *C1File) getConnectorObject(ctx context.Context, tableName string, id string, syncID string, m proto.Message) error {
-	ctx, span := tracer.Start(ctx, "C1File.getConnectorObject")
-	defer span.End()
-
 	err := c.validateDb(ctx)
 	if err != nil {
 		return err
@@ -670,7 +693,7 @@ func (c *C1File) getConnectorObject(ctx context.Context, tableName string, id st
 	case c.viewSyncID != "":
 		q = q.Where(goqu.C("sync_id").Eq(c.viewSyncID))
 	default:
-		var latestSyncRun *syncRun
+		var latestSyncRun *c1zstore.SyncRun
 		var err error
 		latestSyncRun, err = c.getFinishedSync(ctx, 0, connectorstore.SyncTypeAny)
 		if err != nil {
@@ -698,7 +721,7 @@ func (c *C1File) getConnectorObject(ctx context.Context, tableName string, id st
 	row := c.db.QueryRowContext(ctx, query, args...)
 	err = row.Scan(&data)
 	if err != nil {
-		return err
+		return c1zstore.AdaptNotFound(err)
 	}
 
 	err = proto.Unmarshal(data, m)

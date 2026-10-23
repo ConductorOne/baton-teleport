@@ -5,9 +5,11 @@ import (
 	"errors"
 
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/uotel"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
@@ -15,7 +17,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/connectorstore"
 	"github.com/conductorone/baton-sdk/pkg/crypto/providers"
 	"github.com/conductorone/baton-sdk/pkg/crypto/providers/jwk"
-	c1zmanager "github.com/conductorone/baton-sdk/pkg/dotc1z/manager"
+	"github.com/conductorone/baton-sdk/pkg/dotc1z"
 	"github.com/conductorone/baton-sdk/pkg/types"
 )
 
@@ -25,8 +27,7 @@ type Provisioner struct {
 	dbPath    string
 	connector types.ConnectorClient
 
-	store      connectorstore.Reader
-	c1zManager c1zmanager.Manager
+	store connectorstore.Reader
 
 	grantEntitlementID string
 	grantPrincipalID   string
@@ -70,7 +71,8 @@ func makeCrypto(ctx context.Context) (*v2.CredentialOptions, []*v2.EncryptionCon
 
 func (p *Provisioner) Run(ctx context.Context) error {
 	ctx, span := tracer.Start(ctx, "Provisioner.Run")
-	defer span.End()
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 
 	switch {
 	case p.revokeGrantID != "":
@@ -90,21 +92,14 @@ func (p *Provisioner) Run(ctx context.Context) error {
 
 func (p *Provisioner) loadStore(ctx context.Context) (connectorstore.Reader, error) {
 	ctx, span := tracer.Start(ctx, "Provisioner.loadStore")
-	defer span.End()
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 
 	if p.store != nil {
 		return p.store, nil
 	}
 
-	if p.c1zManager == nil {
-		m, err := c1zmanager.New(ctx, p.dbPath)
-		if err != nil {
-			return nil, err
-		}
-		p.c1zManager = m
-	}
-
-	store, err := p.c1zManager.LoadC1Z(ctx)
+	store, err := dotc1z.NewStore(ctx, p.dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -115,23 +110,14 @@ func (p *Provisioner) loadStore(ctx context.Context) (connectorstore.Reader, err
 
 func (p *Provisioner) Close(ctx context.Context) error {
 	ctx, span := tracer.Start(ctx, "Provisioner.Close")
-	defer span.End()
-
 	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 	if p.store != nil {
 		storeErr := p.store.Close(ctx)
 		if storeErr != nil {
 			err = errors.Join(err, storeErr)
 		}
 		p.store = nil
-	}
-
-	if p.c1zManager != nil {
-		managerErr := p.c1zManager.Close(ctx)
-		if managerErr != nil {
-			err = errors.Join(err, managerErr)
-		}
-		p.c1zManager = nil
 	}
 
 	if err != nil {
@@ -141,9 +127,35 @@ func (p *Provisioner) Close(ctx context.Context) error {
 	return nil
 }
 
+// hydrateEntitlementResource returns a copy of e with Resource replaced by
+// resource. The store's entitlement read (GetEntitlement, via
+// V3EntitlementToV2 on the Pebble engine) returns Resource as an
+// identity-only stub; callers that already fetched the full Resource
+// separately (e.g. for the external-resource annotation check) must
+// splice it back in before handing the entitlement to a connector's
+// Grant/Revoke, or the connector never sees the resource's Profile,
+// DisplayName, etc.
+//
+// GrantableTo is untouched: V3EntitlementToV2 also stubs it down to
+// ResourceType id-only entries, and this helper does not re-hydrate those —
+// a connector reading entitlement.GrantableTo display names/traits in
+// Grant/Revoke still sees stubs on the Pebble engine.
+func hydrateEntitlementResource(e *v2.Entitlement, resource *v2.Resource) *v2.Entitlement {
+	if e == nil {
+		return nil
+	}
+	hydrated, ok := proto.Clone(e).(*v2.Entitlement)
+	if !ok {
+		return e
+	}
+	hydrated.SetResource(resource)
+	return hydrated
+}
+
 func (p *Provisioner) grant(ctx context.Context) error {
 	ctx, span := tracer.Start(ctx, "Provisioner.grant")
-	defer span.End()
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 
 	store, err := p.loadStore(ctx)
 	if err != nil {
@@ -179,19 +191,9 @@ func (p *Provisioner) grant(ctx context.Context) error {
 		return err
 	}
 
-	resource := v2.Resource_builder{
-		Id:          principal.GetResource().GetId(),
-		DisplayName: principal.GetResource().GetDisplayName(),
-		Annotations: principal.GetResource().GetAnnotations(),
-		Description: principal.GetResource().GetDescription(),
-		ExternalId:  principal.GetResource().GetExternalId(), //nolint:staticcheck // Deprecated.
-		// Omit parent resource ID so that behavior is the same as ConductorOne's provisioning mode
-		ParentResourceId: nil,
-	}.Build()
-
 	_, err = p.connector.Grant(ctx, v2.GrantManagerServiceGrantRequest_builder{
-		Entitlement: entitlement.GetEntitlement(),
-		Principal:   resource,
+		Entitlement: hydrateEntitlementResource(entitlement.GetEntitlement(), entitlementResource.GetResource()),
+		Principal:   principal.GetResource(),
 	}.Build())
 	if err != nil {
 		return err
@@ -202,7 +204,8 @@ func (p *Provisioner) grant(ctx context.Context) error {
 
 func (p *Provisioner) revoke(ctx context.Context) error {
 	ctx, span := tracer.Start(ctx, "Provisioner.revoke")
-	defer span.End()
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 
 	store, err := p.loadStore(ctx)
 	if err != nil {
@@ -242,21 +245,11 @@ func (p *Provisioner) revoke(ctx context.Context) error {
 		return errors.New("cannot revoke grant on external resource")
 	}
 
-	resource := v2.Resource_builder{
-		Id:          principal.GetResource().GetId(),
-		DisplayName: principal.GetResource().GetDisplayName(),
-		Annotations: principal.GetResource().GetAnnotations(),
-		Description: principal.GetResource().GetDescription(),
-		ExternalId:  principal.GetResource().GetExternalId(), //nolint:staticcheck // Deprecated.
-		// Omit parent resource ID so that behavior is the same as ConductorOne's provisioning mode
-		ParentResourceId: nil,
-	}.Build()
-
 	_, err = p.connector.Revoke(ctx, v2.GrantManagerServiceRevokeRequest_builder{
 		Grant: v2.Grant_builder{
 			Id:          grant.GetGrant().GetId(),
-			Entitlement: entitlement.GetEntitlement(),
-			Principal:   resource,
+			Entitlement: hydrateEntitlementResource(entitlement.GetEntitlement(), entitlementResource.GetResource()),
+			Principal:   principal.GetResource(),
 			Annotations: grant.GetGrant().GetAnnotations(),
 		}.Build(),
 	}.Build())
@@ -269,7 +262,8 @@ func (p *Provisioner) revoke(ctx context.Context) error {
 
 func (p *Provisioner) createAccount(ctx context.Context) error {
 	ctx, span := tracer.Start(ctx, "Provisioner.createAccount")
-	defer span.End()
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 
 	l := ctxzap.Extract(ctx)
 	var emails []*v2.AccountInfo_Email
@@ -310,9 +304,10 @@ func (p *Provisioner) createAccount(ctx context.Context) error {
 
 func (p *Provisioner) deleteResource(ctx context.Context) error {
 	ctx, span := tracer.Start(ctx, "Provisioner.deleteResource")
-	defer span.End()
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 
-	_, err := p.connector.DeleteResource(ctx, v2.DeleteResourceRequest_builder{
+	_, err = p.connector.DeleteResource(ctx, v2.DeleteResourceRequest_builder{
 		ResourceId: v2.ResourceId_builder{
 			Resource:     p.deleteResourceID,
 			ResourceType: p.deleteResourceType,
@@ -326,7 +321,8 @@ func (p *Provisioner) deleteResource(ctx context.Context) error {
 
 func (p *Provisioner) rotateCredentials(ctx context.Context) error {
 	ctx, span := tracer.Start(ctx, "Provisioner.rotateCredentials")
-	defer span.End()
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 
 	l := ctxzap.Extract(ctx)
 

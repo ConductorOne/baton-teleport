@@ -54,27 +54,24 @@ type connectorClient struct {
 	connectorV2.TicketsServiceClient
 	connectorV2.ActionServiceClient
 
-	sessionStoreSetter sessions.SetSessionStore // this is the session store server
+	sessionServer sessions.SessionStoreBinder
 }
 
-var _ sessions.SetSessionStore = (*connectorClient)(nil)
-var _ SetSessionStoreSetter = (*connectorClient)(nil)
+var _ sessions.SessionStoreBinder = (*connectorClient)(nil)
 
-type SetSessionStoreSetter interface {
-	SetSessionStoreSetter(setsessionStoreSetter sessions.SetSessionStore)
+func (c *connectorClient) SetSessionServer(sessionServer sessions.SessionStoreBinder) {
+	c.sessionServer = sessionServer
 }
 
-func (c *connectorClient) SetSessionStoreSetter(sessionStoreSetter sessions.SetSessionStore) {
-	c.sessionStoreSetter = sessionStoreSetter
-}
-
-func (c *connectorClient) SetSessionStore(ctx context.Context, store sessions.SessionStore) {
-	if c.sessionStoreSetter == nil {
-		l := ctxzap.Extract(ctx)
-		l.Warn("connectorClient's session store is nil")
-		return
+func (c *connectorClient) BindSessionStore(ctx context.Context, syncID string, store sessions.SessionStore) (sessions.UnbindSessionStore, error) {
+	if c.sessionServer == nil {
+		// Debug, not Warn: every sync of a connector that did not opt into
+		// session storage reaches this. See
+		// https://github.com/ConductorOne/baton-sdk/issues/907.
+		ctxzap.Extract(ctx).Debug("connector client has no session server — connector did not opt into session storage")
+		return func(context.Context) error { return nil }, nil
 	}
-	c.sessionStoreSetter.SetSessionStore(ctx, store)
+	return c.sessionServer.BindSessionStore(ctx, syncID, store)
 }
 
 var ErrConnectorNotImplemented = errors.New("client does not implement connector connectorV2")
@@ -99,7 +96,7 @@ type wrapper struct {
 
 	now func() time.Time
 
-	SessionServer sessions.SetSessionStore
+	SessionServer sessions.SessionStoreBinder
 }
 
 type Option func(ctx context.Context, w *wrapper) error
@@ -254,25 +251,15 @@ func (cw *wrapper) runServer(ctx context.Context, serverCred *tlsV1.Credential) 
 	}
 	var sessionListenerPort uint32
 	if cw.sessionStoreEnabled {
-		var sessionListenerFile *os.File
-		sessionListenerPort, sessionListenerFile, err = cw.setupListener(ctx)
+		var sessionListener net.Listener
+		sessionListenerPort, sessionListener, err = cw.setupSessionListener(ctx)
 		if err != nil {
 			return 0, fmt.Errorf("failed to setup session listener: %w", err)
 		}
 
-		if sessionListenerFile == nil {
-			return 0, fmt.Errorf("session listener file is nil")
-		}
-
-		// Start the session cache server on the cache listener
-		sessionListener, err := net.FileListener(sessionListenerFile)
-		if err != nil {
-			_ = sessionListenerFile.Close()
-			return 0, fmt.Errorf("failed to create session listener: %w", err)
-		}
 		tlsConfig, err := utls2.ListenerConfig(ctx, serverCred)
 		if err != nil {
-			_ = sessionListenerFile.Close()
+			_ = sessionListener.Close()
 			return 0, fmt.Errorf("failed to create session listener config: %w", err)
 		}
 
@@ -281,7 +268,7 @@ func (cw *wrapper) runServer(ctx context.Context, serverCred *tlsV1.Credential) 
 		server := session.NewGRPCSessionServer()
 		cw.SessionServer = server
 		go func() {
-			defer sessionListenerFile.Close()
+			defer sessionListener.Close()
 			serverErr := session.StartGRPCSessionServerWithOptions(ctx, sessionListener, server,
 				grpc.Creds(credentials.NewTLS(tlsConfig)),
 				grpc.ChainUnaryInterceptor(ugrpc.UnaryServerInterceptor(ctx)...),
@@ -314,8 +301,7 @@ func (cw *wrapper) runServer(ctx context.Context, serverCred *tlsV1.Credential) 
 		return 0, err
 	}
 
-	//nolint:gosec // arg0 is the current executable path; args are passed directly without a shell.
-	cmd := exec.CommandContext(ctx, arg0, args...)
+	cmd := exec.CommandContext(ctx, arg0, args...) // #nosec G702 -- arg0 is the current executable path; args are passed directly without a shell.
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	// Make the server config available via stdin
@@ -342,10 +328,24 @@ func (cw *wrapper) runServer(ctx context.Context, serverCred *tlsV1.Credential) 
 	go func() {
 		waitErr := cmd.Wait()
 		if waitErr != nil {
+			// When the parent context is cancelled during normal shutdown,
+			// exec.CommandContext terminates the child process. Treat that
+			// exit as expected instead of logging it as an unexpected error.
+			errIsExpected := ctx.Err() != nil
+			if errIsExpected {
+				l.Debug("connector service quit expectedly", zap.Error(waitErr))
+				closeErr := cw.Close()
+				if closeErr != nil {
+					l.Error("error closing connector wrapper", zap.Error(closeErr))
+				}
+				os.Exit(0)
+				return
+			}
+
 			l.Error("connector service quit unexpectedly", zap.Error(waitErr))
-			waitErr = cw.Close()
-			if waitErr != nil {
-				l.Error("error closing connector wrapper", zap.Error(waitErr))
+			closeErr := cw.Close()
+			if closeErr != nil {
+				l.Error("error closing connector wrapper", zap.Error(closeErr))
 			}
 			os.Exit(1)
 		}
@@ -426,7 +426,7 @@ func (cw *wrapper) C(ctx context.Context) (types.ConnectorClient, error) {
 
 	cw.conn = conn
 	client := NewConnectorClient(ctx, cw.conn)
-	client.SetSessionStoreSetter(cw.SessionServer)
+	client.SetSessionServer(cw.SessionServer)
 	cw.client = client
 
 	return client, nil
