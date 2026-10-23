@@ -30,14 +30,13 @@ func getAppResource(app types.Application) (*v2.Resource, error) {
 		app.GetName(),
 		appResourceType,
 		appId,
-		[]rs.RoleTraitOption{
-			rs.WithRoleProfile(
-				map[string]interface{}{
-					"app_id":   appId,
-					"app_name": app.GetName(),
-				},
-			),
-		},
+		nil,
+		rs.WithResourceProfile(
+			map[string]interface{}{
+				"app_id":   appId,
+				"app_name": app.GetName(),
+			},
+		),
 	)
 }
 

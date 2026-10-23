@@ -35,13 +35,12 @@ func getNodeResource(node *Node) (*v2.Resource, error) {
 		node.Name,
 		nodeResourceType,
 		node.Id,
-		[]rs.RoleTraitOption{
-			rs.WithRoleProfile(map[string]interface{}{
-				"node_id":   node.Id,
-				"node_name": node.Name,
-				"namespace": node.Namespace,
-			}),
-		},
+		nil,
+		rs.WithResourceProfile(map[string]interface{}{
+			"node_id":   node.Id,
+			"node_name": node.Name,
+			"namespace": node.Namespace,
+		}),
 	)
 }
 

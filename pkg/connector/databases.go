@@ -30,14 +30,13 @@ func getDatabaseResource(db types.Database) (*v2.Resource, error) {
 		db.GetName(),
 		dbResourceType,
 		dbId,
-		[]rs.RoleTraitOption{
-			rs.WithRoleProfile(
-				map[string]interface{}{
-					"db_id":   dbId,
-					"db_name": db.GetName(),
-				},
-			),
-		},
+		nil,
+		rs.WithResourceProfile(
+			map[string]interface{}{
+				"db_id":   dbId,
+				"db_name": db.GetName(),
+			},
+		),
 	)
 }
 

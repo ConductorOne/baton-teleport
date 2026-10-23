@@ -35,15 +35,14 @@ func getRoleResource(role types.Role) (*v2.Resource, error) {
 		role.GetName(),
 		roleResourceType,
 		roleName,
-		[]rs.RoleTraitOption{
-			rs.WithRoleProfile(
-				map[string]interface{}{
-					"role_id":          role.GetMetadata().Revision,
-					"role_name":        roleName,
-					"role_description": role.GetMetadata().Description,
-				},
-			),
-		},
+		nil,
+		rs.WithResourceProfile(
+			map[string]interface{}{
+				"role_id":          role.GetMetadata().Revision,
+				"role_name":        roleName,
+				"role_description": role.GetMetadata().Description,
+			},
+		),
 	)
 }
 

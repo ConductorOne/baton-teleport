@@ -26,7 +26,7 @@ func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 	var (
 		accountType = v2.UserTrait_ACCOUNT_TYPE_HUMAN
-		status      v2.UserTrait_Status_Status
+		status      v2.Status_ResourceStatus
 	)
 
 	if user.IsBot() {
@@ -54,17 +54,15 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 
 	switch user.GetStatus().IsLocked {
 	case true:
-		status = v2.UserTrait_Status_STATUS_DISABLED
+		status = v2.Status_RESOURCE_STATUS_DISABLED
 	case false:
-		status = v2.UserTrait_Status_STATUS_ENABLED
+		status = v2.Status_RESOURCE_STATUS_ENABLED
 	default:
-		status = v2.UserTrait_Status_STATUS_UNSPECIFIED
+		status = v2.Status_RESOURCE_STATUS_UNSPECIFIED
 	}
 
 	opts := []resource.UserTraitOption{
-		resource.WithUserProfile(profile),
 		resource.WithUserLogin(name),
-		resource.WithStatus(status),
 		resource.WithAccountType(accountType),
 	}
 
@@ -76,6 +74,8 @@ func userResource(pId *v2.ResourceId, user types.User) (*v2.Resource, error) {
 		userResourceType,
 		name,
 		opts,
+		resource.WithResourceProfile(profile),
+		resource.WithResourceStatus(status, ""),
 		resource.WithParentResourceID(pId),
 	)
 }
