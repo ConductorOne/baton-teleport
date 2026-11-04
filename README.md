@@ -36,8 +36,8 @@ Check out [Baton](https://github.com/conductorone/baton) to learn more about the
 - Supports entitlements provisioning between users and roles
 
 - Connector actions (usable from a ConductorOne automation "connector action" step):
-  - `lock_user`: creates a Teleport lock targeting a user, which rejects new requests and terminates active sessions. Arguments: `user` (required, Teleport username), `duration` (optional positive Go duration such as `30m` or `24h`; a bare number is read as seconds; days are not supported; omit for a lock that never expires), `message` (optional, shown to the locked-out user). Returns `lock_name` and `expires` (RFC3339).
-  - `unlock_user`: deletes every lock whose target is exactly the given user. Locks on roles, devices or compound targets are not touched.
+  - `lock_user`: creates a Teleport lock targeting a user, which rejects new requests and terminates active sessions. Arguments: `user` (required, Teleport username), `duration` (optional positive Go duration such as `30m` or `24h`; a bare number is read as seconds; days are not supported; omit for a lock that never expires), `message` (optional, shown to the locked-out user). The user must exist. Each call creates a separate lock (not idempotent). Returns `lock_name` and `expires` (RFC3339).
+  - `unlock_user`: deletes every lock whose target is exactly the given user. Locks on roles, devices or compound targets are not touched. The user does not need to exist. Returns `deleted_locks` (number).
   - Locking requires Teleport Enterprise (Identity Governance) and the connector identity needs a role with:
     ```yaml
     rules:
