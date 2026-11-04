@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -84,7 +85,6 @@ func lockUserSchema() *v2.BatonActionSchema {
 		DisplayName: "Lock Teleport user",
 		Description: "Locks a Teleport user so that new requests are rejected and active sessions are terminated. " +
 			"The lock stays in force until it expires or is removed with unlock_user.",
-		ActionType: []v2.ActionType{v2.ActionType_ACTION_TYPE_ACCOUNT_DISABLE},
 		Arguments: []*config.Field{
 			userArgField(),
 			stringArgField(argDuration, "Duration",
@@ -104,20 +104,20 @@ func unlockUserSchema() *v2.BatonActionSchema {
 		Name:        unlockUserActionName,
 		DisplayName: "Unlock Teleport user",
 		Description: "Removes all Teleport locks that target exactly this user. Locks on roles, devices or other targets are left untouched.",
-		ActionType:  []v2.ActionType{v2.ActionType_ACTION_TYPE_ACCOUNT_ENABLE},
 		Arguments:   []*config.Field{userArgField()},
 		ReturnTypes: []*config.Field{
-			stringArgField("deleted_locks", "Deleted locks", "Number of locks removed.", "", false),
+			config.Field_builder{
+				Name:        "deleted_locks",
+				DisplayName: "Deleted locks",
+				Description: "Number of locks removed.",
+				IntField:    &config.IntField{},
+			}.Build(),
 		},
 	}
 }
 
-// parseLockDuration parses an optional duration argument. It returns 0 when absent.
+// parseLockDuration parses a non-empty Go duration string.
 func parseLockDuration(raw string) (time.Duration, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0, nil
-	}
 	d, err := time.ParseDuration(raw)
 	if err != nil {
 		return 0, fmt.Errorf("baton-teleport: invalid %s %q (use a Go duration such as 30m or 24h): %w", argDuration, raw, err)
@@ -128,22 +128,44 @@ func parseLockDuration(raw string) (time.Duration, error) {
 	return d, nil
 }
 
+// maxDurationSeconds keeps the seconds-to-Duration conversion within int64 nanoseconds.
+const maxDurationSeconds = float64(math.MaxInt64/int64(time.Second)) - 1
+
 // durationArg reads the optional duration. Accepts a string, or a number of seconds.
-func durationArg(args *structpb.Struct) (time.Duration, error) {
-	if v, ok := args.GetFields()[argDuration]; ok {
-		if _, isNum := v.GetKind().(*structpb.Value_NumberValue); isNum {
-			secs := v.GetNumberValue()
-			if secs <= 0 || secs > float64(1<<40) {
-				return 0, fmt.Errorf("baton-teleport: %s must be a positive number of seconds, got %v", argDuration, secs)
-			}
-			return time.Duration(secs * float64(time.Second)), nil
-		}
+// It never returns a non-positive duration for a supplied value, so a bad value cannot
+// silently become a permanent lock.
+func durationArg(args *structpb.Struct) (time.Duration, bool, error) {
+	v, ok := args.GetFields()[argDuration]
+	if !ok {
+		return 0, false, nil
 	}
-	raw, _ := actions.GetStringArg(args, argDuration)
-	return parseLockDuration(raw)
+	switch k := v.GetKind().(type) {
+	case *structpb.Value_NullValue:
+		return 0, false, nil
+	case *structpb.Value_NumberValue:
+		secs := k.NumberValue
+		if math.IsNaN(secs) || secs <= 0 || secs > maxDurationSeconds {
+			return 0, false, fmt.Errorf("baton-teleport: %s must be a positive number of seconds no greater than %.0f, got %v", argDuration, maxDurationSeconds, secs)
+		}
+		d := time.Duration(secs * float64(time.Second))
+		if d <= 0 {
+			return 0, false, fmt.Errorf("baton-teleport: %s of %v seconds is too small (minimum is 1ns)", argDuration, secs)
+		}
+		return d, true, nil
+	case *structpb.Value_StringValue:
+		raw := strings.TrimSpace(k.StringValue)
+		if raw == "" {
+			return 0, false, nil
+		}
+		d, err := parseLockDuration(raw)
+		return d, err == nil, err
+	default:
+		return 0, false, fmt.Errorf("baton-teleport: %s must be a string or a number of seconds", argDuration)
+	}
 }
 
-func (l *lockActions) requireUser(ctx context.Context, args *structpb.Struct) (string, error) {
+// requireUserArg validates the user argument and that a client is configured.
+func (l *lockActions) requireUserArg(args *structpb.Struct) (string, error) {
 	if l.api == nil {
 		return "", fmt.Errorf("baton-teleport: teleport client is not configured")
 	}
@@ -155,23 +177,32 @@ func (l *lockActions) requireUser(ctx context.Context, args *structpb.Struct) (s
 	if user == "" {
 		return "", fmt.Errorf("baton-teleport: %s is required", argUser)
 	}
-	if _, err := l.api.GetUser(ctx, user, false); err != nil {
-		if trace.IsNotFound(err) {
-			return "", fmt.Errorf("baton-teleport: user %q not found: %w", user, err)
-		}
-		return "", fmt.Errorf("baton-teleport: failed to get user %q: %w", user, err)
-	}
 	return user, nil
 }
 
+// wrapAPIError adds an actionable hint for RBAC failures.
+func wrapAPIError(err error, format string, a ...any) error {
+	msg := fmt.Sprintf(format, a...)
+	if trace.IsAccessDenied(err) {
+		return fmt.Errorf("baton-teleport: %s: missing lock RBAC; the connector role needs rules for resource 'lock' with verbs [list, create, read, update, delete] (and read on 'user'): %w", msg, err)
+	}
+	return fmt.Errorf("baton-teleport: %s: %w", msg, err)
+}
+
 func (l *lockActions) lockUser(ctx context.Context, args *structpb.Struct) (*structpb.Struct, annotations.Annotations, error) {
-	user, err := l.requireUser(ctx, args)
+	user, err := l.requireUserArg(args)
 	if err != nil {
 		return nil, nil, err
 	}
-	d, err := durationArg(args)
+	d, hasDuration, err := durationArg(args)
 	if err != nil {
 		return nil, nil, err
+	}
+	if _, err := l.api.GetUser(ctx, user, false); err != nil {
+		if trace.IsNotFound(err) {
+			return nil, nil, fmt.Errorf("baton-teleport: user %q not found: %w", user, err)
+		}
+		return nil, nil, wrapAPIError(err, "failed to get user %q", user)
 	}
 	message, _ := actions.GetStringArg(args, argMessage)
 	if strings.TrimSpace(message) == "" {
@@ -183,7 +214,7 @@ func (l *lockActions) lockUser(ctx context.Context, args *structpb.Struct) (*str
 		Message: message,
 	}
 	var expires string
-	if d > 0 {
+	if hasDuration {
 		t := l.now().UTC().Add(d)
 		spec.Expires = &t
 		expires = t.Format(time.RFC3339)
@@ -196,7 +227,7 @@ func (l *lockActions) lockUser(ctx context.Context, args *structpb.Struct) (*str
 		return nil, nil, fmt.Errorf("baton-teleport: failed to build lock for user %q: %w", user, err)
 	}
 	if err := l.api.UpsertLock(ctx, lock); err != nil {
-		return nil, nil, fmt.Errorf("baton-teleport: failed to lock user %q: %w", user, err)
+		return nil, nil, wrapAPIError(err, "failed to lock user %q", user)
 	}
 
 	return actions.NewReturnValues(true,
@@ -206,7 +237,8 @@ func (l *lockActions) lockUser(ctx context.Context, args *structpb.Struct) (*str
 }
 
 func (l *lockActions) unlockUser(ctx context.Context, args *structpb.Struct) (*structpb.Struct, annotations.Annotations, error) {
-	user, err := l.requireUser(ctx, args)
+	// The user need not exist: this must still be able to clear a stale lock.
+	user, err := l.requireUserArg(args)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -218,17 +250,22 @@ func (l *lockActions) unlockUser(ctx context.Context, args *structpb.Struct) (*s
 	for {
 		locks, next, err := l.api.ListLocks(ctx, 0, startKey, filter)
 		if err != nil {
-			return nil, nil, fmt.Errorf("baton-teleport: failed to list locks for user %q: %w", user, err)
+			return nil, nil, wrapAPIError(err, "failed to list locks for user %q", user)
 		}
 		for _, lock := range locks {
 			// Only exact user locks; compound targets (e.g. user+role) are not ours to remove.
 			if !lock.Target().Equals(target) {
 				continue
 			}
-			if err := l.api.DeleteLock(ctx, lock.GetName()); err != nil && !trace.IsNotFound(err) {
-				return nil, nil, fmt.Errorf("baton-teleport: failed to delete lock %q for user %q: %w", lock.GetName(), user, err)
+			err := l.api.DeleteLock(ctx, lock.GetName())
+			switch {
+			case err == nil:
+				deleted++
+			case trace.IsNotFound(err):
+				// Already gone (expired or removed concurrently).
+			default:
+				return nil, nil, wrapAPIError(err, "failed to delete lock %q for user %q", lock.GetName(), user)
 			}
-			deleted++
 		}
 		if next == "" {
 			break
@@ -237,6 +274,6 @@ func (l *lockActions) unlockUser(ctx context.Context, args *structpb.Struct) (*s
 	}
 
 	return actions.NewReturnValues(true,
-		actions.NewStringReturnField("deleted_locks", fmt.Sprintf("%d", deleted)),
+		actions.NewNumberReturnField("deleted_locks", float64(deleted)),
 	), nil, nil
 }
