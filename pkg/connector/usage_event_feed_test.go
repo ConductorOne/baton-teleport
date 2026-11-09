@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/gravitational/teleport/api/types/events"
 	"github.com/stretchr/testify/require"
@@ -178,6 +179,8 @@ func TestConvertToUsageEvent_Success(t *testing.T) {
 	require.Equal(t, userResourceType.Id, usageEvt.ActorResource.Id.ResourceType)
 	require.Equal(t, "alice", usageEvt.ActorResource.Id.Resource)
 	require.Equal(t, "alice", usageEvt.ActorResource.DisplayName)
+
+	require.Equal(t, v2.UsageEvent_TARGET_KIND_APP_ACCESS, usageEvt.GetTargetKind())
 }
 
 func TestConvertToUsageEvent_FailedLogin(t *testing.T) {
