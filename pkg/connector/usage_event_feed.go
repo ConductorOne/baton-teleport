@@ -138,6 +138,7 @@ func convertToUsageEvent(auditEvent events.AuditEvent) (*v2.Event, time.Time) {
 					},
 					DisplayName: userLogin.User,
 				},
+				TargetKind: v2.UsageEvent_TARGET_KIND_APP_ACCESS,
 			},
 		},
 	}, eventTime
