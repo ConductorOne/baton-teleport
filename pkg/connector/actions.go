@@ -9,9 +9,10 @@ import (
 
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/google/uuid"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/trace"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	config "github.com/conductorone/baton-sdk/pb/c1/config/v1"
@@ -28,12 +29,15 @@ const (
 	argDuration = "duration"
 	argMessage  = "message"
 
+	lockNamePrefix = "c1-"
+
 	defaultLockMessage = "This user has been locked by ConductorOne."
 )
 
 // lockAPI is the subset of the Teleport client used by the lock actions.
 type lockAPI interface {
 	GetUser(ctx context.Context, name string, withSecrets bool) (types.User, error)
+	GetLock(ctx context.Context, name string) (types.Lock, error)
 	UpsertLock(ctx context.Context, lock types.Lock) error
 	DeleteLock(ctx context.Context, name string) error
 	ListLocks(ctx context.Context, limit int, startKey string, filter *types.LockFilter) ([]types.Lock, string, error)
@@ -84,6 +88,7 @@ func lockUserSchema() *v2.BatonActionSchema {
 		Name:        lockUserActionName,
 		DisplayName: "Lock Teleport user",
 		Description: "Locks a Teleport user so that new requests are rejected and active sessions are terminated. " +
+			"The lock is named c1-<username>. Repeat calls reuse that lock and never shorten it. " +
 			"The lock stays in force until it expires or is removed with unlock_user.",
 		Arguments: []*config.Field{
 			userArgField(),
@@ -103,14 +108,21 @@ func unlockUserSchema() *v2.BatonActionSchema {
 	return &v2.BatonActionSchema{
 		Name:        unlockUserActionName,
 		DisplayName: "Unlock Teleport user",
-		Description: "Removes all Teleport locks that target exactly this user. Locks on roles, devices or other targets are left untouched.",
-		Arguments:   []*config.Field{userArgField()},
+		Description: "Removes all non-expired Teleport locks that target exactly this user, whatever their name or creator. " +
+			"Expired locks and locks on roles, devices or compound targets are left untouched.",
+		Arguments: []*config.Field{userArgField()},
 		ReturnTypes: []*config.Field{
 			config.Field_builder{
 				Name:        "deleted_locks",
 				DisplayName: "Deleted locks",
 				Description: "Number of locks removed.",
 				IntField:    &config.IntField{},
+			}.Build(),
+			config.Field_builder{
+				Name:             "deleted_lock_names",
+				DisplayName:      "Deleted lock names",
+				Description:      "Names of the locks removed.",
+				StringSliceField: &config.StringSliceField{},
 			}.Build(),
 		},
 	}
@@ -213,19 +225,34 @@ func (l *lockActions) lockUser(ctx context.Context, args *structpb.Struct) (*str
 		message = defaultLockMessage
 	}
 
+	target := types.LockTarget{User: user}
 	spec := types.LockSpecV2{
-		Target:  types.LockTarget{User: user},
+		Target:  target,
 		Message: message,
 	}
-	var expires string
+	now := l.now()
+	var requested *time.Time
 	if hasDuration {
-		t := l.now().UTC().Add(d)
+		t := now.UTC().Add(d)
 		spec.Expires = &t
-		expires = t.Format(time.RFC3339)
+		requested = &t
 	}
 
-	// A fresh UUID name (as `tctl lock` does) means upsert never overwrites an existing lock.
-	name := uuid.NewString()
+	name := lockNamePrefix + user
+	existing, err := l.api.GetLock(ctx, name)
+	switch {
+	case err == nil:
+		if !existing.Target().Equals(target) {
+			return nil, nil, fmt.Errorf("baton-teleport: lock %q already exists with a different target and was not modified", name)
+		}
+		if lockCoversRequest(existing, requested, now) {
+			return lockUserResult(name, existing.LockExpiry()), nil, nil
+		}
+	case trace.IsNotFound(err):
+	default:
+		return nil, nil, wrapAPIError(err, "failed to get lock %q", name)
+	}
+
 	lock, err := types.NewLock(name, spec)
 	if err != nil {
 		return nil, nil, fmt.Errorf("baton-teleport: failed to build lock for user %q: %w", user, err)
@@ -234,10 +261,32 @@ func (l *lockActions) lockUser(ctx context.Context, args *structpb.Struct) (*str
 		return nil, nil, wrapAPIError(err, "failed to lock user %q", user)
 	}
 
+	return lockUserResult(name, requested), nil, nil
+}
+
+func lockCoversRequest(existing types.Lock, requested *time.Time, now time.Time) bool {
+	current := existing.LockExpiry()
+	if current == nil {
+		return true
+	}
+	if !current.After(now) {
+		return false
+	}
+	if requested == nil {
+		return false
+	}
+	return !current.Before(*requested)
+}
+
+func lockUserResult(name string, expiry *time.Time) *structpb.Struct {
+	var expires string
+	if expiry != nil {
+		expires = expiry.UTC().Format(time.RFC3339)
+	}
 	return actions.NewReturnValues(true,
 		actions.NewStringReturnField("lock_name", name),
 		actions.NewStringReturnField("expires", expires),
-	), nil, nil
+	)
 }
 
 func (l *lockActions) unlockUser(ctx context.Context, args *structpb.Struct) (*structpb.Struct, annotations.Annotations, error) {
@@ -249,7 +298,9 @@ func (l *lockActions) unlockUser(ctx context.Context, args *structpb.Struct) (*s
 
 	target := types.LockTarget{User: user}
 	filter := &types.LockFilter{Targets: []*types.LockTarget{&target}}
-	deleted := 0
+	logger := ctxzap.Extract(ctx)
+	now := l.now()
+	deletedNames := []string{}
 	startKey := ""
 	for {
 		locks, next, err := l.api.ListLocks(ctx, 0, startKey, filter)
@@ -261,10 +312,15 @@ func (l *lockActions) unlockUser(ctx context.Context, args *structpb.Struct) (*s
 			if !lock.Target().Equals(target) {
 				continue
 			}
+			if expiry := lock.LockExpiry(); expiry != nil && !expiry.After(now) {
+				logger.Debug("skipping expired lock", zap.String("user", user), zap.String("lock_name", lock.GetName()))
+				continue
+			}
 			err := l.api.DeleteLock(ctx, lock.GetName())
 			switch {
 			case err == nil:
-				deleted++
+				deletedNames = append(deletedNames, lock.GetName())
+				logger.Info("deleted lock", zap.String("user", user), zap.String("lock_name", lock.GetName()))
 			case trace.IsNotFound(err):
 				// Already gone (expired or removed concurrently).
 			default:
@@ -278,6 +334,7 @@ func (l *lockActions) unlockUser(ctx context.Context, args *structpb.Struct) (*s
 	}
 
 	return actions.NewReturnValues(true,
-		actions.NewNumberReturnField("deleted_locks", float64(deleted)),
+		actions.NewNumberReturnField("deleted_locks", float64(len(deletedNames))),
+		actions.NewStringListReturnField("deleted_lock_names", deletedNames),
 	), nil, nil
 }

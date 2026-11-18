@@ -16,16 +16,18 @@ import (
 )
 
 type fakeLockAPI struct {
-	users     map[string]bool
-	getErr    error
-	upsertErr error
-	locks     []types.Lock
-	pageSize  int
-	listErr   error
-	deleteErr map[string]error
-	upserted  []types.Lock
-	deleted   []string
-	getCalls  int
+	users      map[string]bool
+	getErr     error
+	upsertErr  error
+	locks      []types.Lock
+	byName     map[string]types.Lock
+	getLockErr error
+	pageSize   int
+	listErr    error
+	deleteErr  map[string]error
+	upserted   []types.Lock
+	deleted    []string
+	getCalls   int
 }
 
 func (f *fakeLockAPI) GetUser(_ context.Context, name string, _ bool) (types.User, error) {
@@ -37,6 +39,16 @@ func (f *fakeLockAPI) GetUser(_ context.Context, name string, _ bool) (types.Use
 		return nil, trace.NotFound("user %q not found", name)
 	}
 	return types.NewUser(name)
+}
+
+func (f *fakeLockAPI) GetLock(_ context.Context, name string) (types.Lock, error) {
+	if f.getLockErr != nil {
+		return nil, f.getLockErr
+	}
+	if l, ok := f.byName[name]; ok {
+		return l, nil
+	}
+	return nil, trace.NotFound("lock %q not found", name)
 }
 
 func (f *fakeLockAPI) UpsertLock(_ context.Context, l types.Lock) error {
@@ -80,6 +92,14 @@ func mustLock(t *testing.T, name string, target types.LockTarget) types.Lock {
 	require.NoError(t, err)
 	return l
 }
+
+func mustLockExpiring(t *testing.T, name string, target types.LockTarget, expires *time.Time) types.Lock {
+	l, err := types.NewLock(name, types.LockSpecV2{Target: target, Expires: expires, Message: "existing"})
+	require.NoError(t, err)
+	return l
+}
+
+var lockTestNow = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 
 func newArgs(t *testing.T, m map[string]any) *structpb.Struct {
 	s, err := structpb.NewStruct(m)
@@ -137,6 +157,13 @@ func TestLockUser(t *testing.T) {
 			wantErr: "missing lock RBAC",
 		},
 		{name: "access denied on get user", args: map[string]any{"user": "alice"}, api: &fakeLockAPI{getErr: trace.AccessDenied("nope")}, wantErr: "missing lock RBAC"},
+		{name: "get lock error", args: map[string]any{"user": "alice"}, api: &fakeLockAPI{users: map[string]bool{"alice": true}, getLockErr: errors.New("boom")}, wantErr: "failed to get lock"},
+		{
+			name:    "get lock access denied",
+			args:    map[string]any{"user": "alice"},
+			api:     &fakeLockAPI{users: map[string]bool{"alice": true}, getLockErr: trace.AccessDenied("nope")},
+			wantErr: "missing lock RBAC",
+		},
 		{name: "upsert error", args: map[string]any{"user": "alice"}, api: &fakeLockAPI{users: map[string]bool{"alice": true}, upsertErr: errors.New("denied")}, wantErr: "failed to lock user"},
 	}
 	for _, tt := range tests {
@@ -160,7 +187,114 @@ func TestLockUser(t *testing.T) {
 				require.True(t, tt.wantExpires.Equal(*l.LockExpiry()))
 			}
 			require.True(t, out.GetFields()["success"].GetBoolValue())
+			require.Equal(t, "c1-alice", l.GetName())
 			require.Equal(t, l.GetName(), out.GetFields()["lock_name"].GetStringValue())
+		})
+	}
+}
+
+func TestLockUserDeterministicNameKeepsUsernameVerbatim(t *testing.T) {
+	user := "Jane.Doe+test@example.com"
+	api := &fakeLockAPI{users: map[string]bool{user: true}}
+	la := &lockActions{api: api, now: func() time.Time { return lockTestNow }}
+	out, _, err := la.lockUser(context.Background(), newArgs(t, map[string]any{"user": user}))
+	require.NoError(t, err)
+	require.Len(t, api.upserted, 1)
+	require.Equal(t, "c1-"+user, api.upserted[0].GetName())
+	require.Equal(t, "c1-"+user, out.GetFields()["lock_name"].GetStringValue())
+}
+
+func TestLockUserExistingLock(t *testing.T) {
+	alice := types.LockTarget{User: "alice"}
+	later := lockTestNow.Add(10 * time.Hour)
+	earlier := lockTestNow.Add(1 * time.Hour)
+	past := lockTestNow.Add(-1 * time.Hour)
+	tests := []struct {
+		name        string
+		existing    types.Lock
+		args        map[string]any
+		wantErr     string
+		wantUpsert  bool
+		wantExpires string
+	}{
+		{
+			name:        "unexpired lock with later expiry is returned unchanged",
+			existing:    mustLockExpiring(t, "c1-alice", alice, &later),
+			args:        map[string]any{"user": "alice", "duration": "2h"},
+			wantExpires: later.Format(time.RFC3339),
+		},
+		{
+			name:        "unexpired lock with equal expiry is returned unchanged",
+			existing:    mustLockExpiring(t, "c1-alice", alice, ptr(lockTestNow.Add(2*time.Hour))),
+			args:        map[string]any{"user": "alice", "duration": "2h"},
+			wantExpires: lockTestNow.Add(2 * time.Hour).Format(time.RFC3339),
+		},
+		{
+			name:        "lock without expiry is never shortened",
+			existing:    mustLockExpiring(t, "c1-alice", alice, nil),
+			args:        map[string]any{"user": "alice", "duration": "2h"},
+			wantExpires: "",
+		},
+		{
+			name:        "lock without expiry stays when no duration requested",
+			existing:    mustLockExpiring(t, "c1-alice", alice, nil),
+			args:        map[string]any{"user": "alice"},
+			wantExpires: "",
+		},
+		{
+			name:        "earlier expiry is extended",
+			existing:    mustLockExpiring(t, "c1-alice", alice, &earlier),
+			args:        map[string]any{"user": "alice", "duration": "2h", "message": "again"},
+			wantUpsert:  true,
+			wantExpires: lockTestNow.Add(2 * time.Hour).Format(time.RFC3339),
+		},
+		{
+			name:        "expiring lock becomes permanent when no duration requested",
+			existing:    mustLockExpiring(t, "c1-alice", alice, &later),
+			args:        map[string]any{"user": "alice"},
+			wantUpsert:  true,
+			wantExpires: "",
+		},
+		{
+			name:        "expired lock is replaced",
+			existing:    mustLockExpiring(t, "c1-alice", alice, &past),
+			args:        map[string]any{"user": "alice", "duration": "30m"},
+			wantUpsert:  true,
+			wantExpires: lockTestNow.Add(30 * time.Minute).Format(time.RFC3339),
+		},
+		{
+			name:     "different target is a conflict",
+			existing: mustLockExpiring(t, "c1-alice", types.LockTarget{User: "alice", Role: "admin"}, nil),
+			args:     map[string]any{"user": "alice"},
+			wantErr:  "different target",
+		},
+		{
+			name:     "other user target is a conflict",
+			existing: mustLockExpiring(t, "c1-alice", types.LockTarget{User: "bob"}, nil),
+			args:     map[string]any{"user": "alice"},
+			wantErr:  "different target",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			api := &fakeLockAPI{users: map[string]bool{"alice": true}, byName: map[string]types.Lock{"c1-alice": tt.existing}}
+			la := &lockActions{api: api, now: func() time.Time { return lockTestNow }}
+			out, _, err := la.lockUser(context.Background(), newArgs(t, tt.args))
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				require.Empty(t, api.upserted)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, "c1-alice", out.GetFields()["lock_name"].GetStringValue())
+			require.Equal(t, tt.wantExpires, out.GetFields()["expires"].GetStringValue())
+			if !tt.wantUpsert {
+				require.Empty(t, api.upserted)
+				return
+			}
+			require.Len(t, api.upserted, 1)
+			require.Equal(t, "c1-alice", api.upserted[0].GetName())
+			require.Equal(t, tt.args["message"] != nil, api.upserted[0].Message() == "again")
 		})
 	}
 }
@@ -191,6 +325,23 @@ func TestUnlockUser(t *testing.T) {
 				userLock("l1"), mustLock(t, "l2", types.LockTarget{User: "alice", Role: "admin"}), userLock("l3"),
 			}},
 			user: "alice", wantDeleted: []string{"l1", "l3"}, wantCount: 2,
+		},
+		{
+			name: "deletes exact locks of different names",
+			api: &fakeLockAPI{locks: []types.Lock{
+				userLock("c1-alice"), userLock("11111111-2222-3333-4444-555555555555"), userLock("manual lock"),
+			}},
+			user: "alice", wantDeleted: []string{"c1-alice", "11111111-2222-3333-4444-555555555555", "manual lock"}, wantCount: 3,
+		},
+		{
+			name: "skips expired locks and keeps unexpired and permanent ones",
+			api: &fakeLockAPI{locks: []types.Lock{
+				mustLockExpiring(t, "expired", types.LockTarget{User: "alice"}, ptr(lockTestNow.Add(-time.Minute))),
+				mustLockExpiring(t, "at-now", types.LockTarget{User: "alice"}, ptr(lockTestNow)),
+				mustLockExpiring(t, "future", types.LockTarget{User: "alice"}, ptr(lockTestNow.Add(time.Hour))),
+				userLock("permanent"),
+			}},
+			user: "alice", wantDeleted: []string{"future", "permanent"}, wantCount: 2,
 		},
 		{
 			name: "user absent but lock present",
@@ -235,7 +386,7 @@ func TestUnlockUser(t *testing.T) {
 			if tt.user != nil {
 				m["user"] = tt.user
 			}
-			la := &lockActions{api: tt.api, now: time.Now}
+			la := &lockActions{api: tt.api, now: func() time.Time { return lockTestNow }}
 			out, _, err := la.unlockUser(context.Background(), newArgs(t, m))
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
@@ -245,6 +396,11 @@ func TestUnlockUser(t *testing.T) {
 			require.Zero(t, tt.api.getCalls, "unlock must not require the user to exist")
 			require.Equal(t, tt.wantDeleted, tt.api.deleted)
 			require.EqualValues(t, tt.wantCount, out.GetFields()["deleted_locks"].GetNumberValue())
+			var names []string
+			for _, v := range out.GetFields()["deleted_lock_names"].GetListValue().GetValues() {
+				names = append(names, v.GetStringValue())
+			}
+			require.Equal(t, tt.wantDeleted, names)
 		})
 	}
 }
