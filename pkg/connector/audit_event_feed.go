@@ -65,11 +65,11 @@ const (
 	accessRequestExpireEventType = "access_request.expire"
 
 	// Lock events use past-tense strings (verified against live API).
-	// lock.created fires when a user is suspended via a Teleport lock.
-	// lock.deleted fires when the lock is removed (user re-enabled).
+	// lock.created fires when a Teleport lock is created.
+	// lock.deleted fires when a Teleport lock is removed.
 	//
-	// Only user targets are relevant: Get() on a user surfaces IsLocked
-	// as STATUS_DISABLED/STATUS_ENABLED. Role targets are ignored because
+	// Only user targets are relevant: they trigger a re-read of the user, which
+	// reflects only the login lockout (IsLocked). Role targets are ignored because
 	// the role resource has no lock/status field — Get() returns nothing new.
 	lockCreateEventType = "lock.created"
 	lockDeleteEventType = "lock.deleted"
@@ -89,7 +89,7 @@ const (
 //
 // lock.deleted IS included (unlike other delete events) because it deletes
 // the *lock*, not the user. The user still exists and Get() returns them
-// with IsLocked=false → STATUS_ENABLED.
+// and the status reflects only the login lockout (IsLocked).
 //
 // app.create, app.update, db.create, db.update are intentionally excluded:
 // List() uses Metadata.Revision as the resource ID for apps and databases,
@@ -231,8 +231,8 @@ func convertAuditEvent(auditEvent events.AuditEvent) ([]*v2.Event, time.Time) {
 	case *events.RoleUpdate:
 		return singleResourceChange(e.GetID(), e.GetTime(), roleResourceType.Id, e.Name)
 	// --- Locks ---
-	// Only user targets are handled: Get() surfaces IsLocked as STATUS_DISABLED/
-	// STATUS_ENABLED. Role targets are ignored (role Get() has no lock status).
+	// Only user targets are handled: they trigger a re-read of the user, which reflects
+	// only the login lockout (IsLocked). Role targets are ignored (role Get() has no lock status).
 	case *events.LockCreate:
 		return convertLockEvent(e.GetID(), e.GetTime(), e.Lock.Target)
 	case *events.LockDelete:
