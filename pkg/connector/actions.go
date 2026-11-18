@@ -184,7 +184,11 @@ func (l *lockActions) requireUserArg(args *structpb.Struct) (string, error) {
 func wrapAPIError(err error, format string, a ...any) error {
 	msg := fmt.Sprintf(format, a...)
 	if trace.IsAccessDenied(err) {
-		return fmt.Errorf("baton-teleport: %s: missing lock RBAC; the connector role needs rules for resource 'lock' with verbs [list, create, read, update, delete] (and read on 'user'): %w", msg, err)
+		return fmt.Errorf(
+			"baton-teleport: %s: missing lock RBAC; the connector role needs rules for resource 'lock' "+
+				"with verbs [list, create, read, update, delete] (and read on 'user'): %w",
+			msg, err,
+		)
 	}
 	return fmt.Errorf("baton-teleport: %s: %w", msg, err)
 }

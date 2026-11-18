@@ -98,8 +98,20 @@ func TestLockUser(t *testing.T) {
 		wantMessage string
 	}{
 		{name: "no expiry default message", args: map[string]any{"user": "alice"}, api: &fakeLockAPI{users: map[string]bool{"alice": true}}, wantMessage: defaultLockMessage},
-		{name: "duration string", args: map[string]any{"user": "alice", "duration": "2h", "message": "bye"}, api: &fakeLockAPI{users: map[string]bool{"alice": true}}, wantExpires: ptr(fixed.Add(2 * time.Hour)), wantMessage: "bye"},
-		{name: "duration seconds number", args: map[string]any{"user": "alice", "duration": 90.0}, api: &fakeLockAPI{users: map[string]bool{"alice": true}}, wantExpires: ptr(fixed.Add(90 * time.Second)), wantMessage: defaultLockMessage},
+		{
+			name:        "duration string",
+			args:        map[string]any{"user": "alice", "duration": "2h", "message": "bye"},
+			api:         &fakeLockAPI{users: map[string]bool{"alice": true}},
+			wantExpires: ptr(fixed.Add(2 * time.Hour)),
+			wantMessage: "bye",
+		},
+		{
+			name:        "duration seconds number",
+			args:        map[string]any{"user": "alice", "duration": 90.0},
+			api:         &fakeLockAPI{users: map[string]bool{"alice": true}},
+			wantExpires: ptr(fixed.Add(90 * time.Second)),
+			wantMessage: defaultLockMessage,
+		},
 		{name: "missing user", args: map[string]any{}, api: &fakeLockAPI{}, wantErr: "baton-teleport:"},
 		{name: "blank user", args: map[string]any{"user": "  "}, api: &fakeLockAPI{}, wantErr: "user is required"},
 		{name: "unknown user", args: map[string]any{"user": "bob"}, api: &fakeLockAPI{users: map[string]bool{}}, wantErr: "not found"},
@@ -110,9 +122,20 @@ func TestLockUser(t *testing.T) {
 		{name: "unparseable duration", args: map[string]any{"user": "alice", "duration": "soon"}, api: &fakeLockAPI{users: map[string]bool{"alice": true}}, wantErr: "invalid duration"},
 		{name: "overflowing seconds", args: map[string]any{"user": "alice", "duration": 1e10}, api: &fakeLockAPI{users: map[string]bool{"alice": true}}, wantErr: "no greater than"},
 		{name: "sub-nanosecond seconds", args: map[string]any{"user": "alice", "duration": 1e-10}, api: &fakeLockAPI{users: map[string]bool{"alice": true}}, wantErr: "too small"},
-		{name: "max-ish seconds ok", args: map[string]any{"user": "alice", "duration": 1e9}, api: &fakeLockAPI{users: map[string]bool{"alice": true}}, wantExpires: ptr(fixed.Add(1e9 * time.Second)), wantMessage: defaultLockMessage},
+		{
+			name:        "max-ish seconds ok",
+			args:        map[string]any{"user": "alice", "duration": 1e9},
+			api:         &fakeLockAPI{users: map[string]bool{"alice": true}},
+			wantExpires: ptr(fixed.Add(1e9 * time.Second)),
+			wantMessage: defaultLockMessage,
+		},
 		{name: "bool duration", args: map[string]any{"user": "alice", "duration": true}, api: &fakeLockAPI{users: map[string]bool{"alice": true}}, wantErr: "string or a number"},
-		{name: "access denied on upsert", args: map[string]any{"user": "alice"}, api: &fakeLockAPI{users: map[string]bool{"alice": true}, upsertErr: trace.AccessDenied("nope")}, wantErr: "missing lock RBAC"},
+		{
+			name:    "access denied on upsert",
+			args:    map[string]any{"user": "alice"},
+			api:     &fakeLockAPI{users: map[string]bool{"alice": true}, upsertErr: trace.AccessDenied("nope")},
+			wantErr: "missing lock RBAC",
+		},
 		{name: "access denied on get user", args: map[string]any{"user": "alice"}, api: &fakeLockAPI{getErr: trace.AccessDenied("nope")}, wantErr: "missing lock RBAC"},
 		{name: "upsert error", args: map[string]any{"user": "alice"}, api: &fakeLockAPI{users: map[string]bool{"alice": true}, upsertErr: errors.New("denied")}, wantErr: "failed to lock user"},
 	}
