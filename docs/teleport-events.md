@@ -105,7 +105,7 @@ Why:
 What this means in practice:
 - **Role additions** propagate immediately via `CreateGrantEvent`.
 - **Role removals** are visible only after the next full sync (typically minutes to hours, depending on the sync schedule).
-- Profile changes (status, email, locks) propagate immediately via `ResourceChangeEvent`.
+- Profile changes (login lockout status, email) and lock events propagate immediately via `ResourceChangeEvent`, which makes C1 re-read the user.
 
 > **Live API verification (2026-02-27):** `CreateUser()` fires `user.create` (`*events.UserCreate`), `UpdateUser()` fires `user.update` (`*events.UserUpdate`). These are **separate** event types, not upsert semantics.
 
@@ -202,12 +202,13 @@ Teleport access requests use multiple event types for the request lifecycle. All
 |-------|-------|
 | Teleport event string | `lock.created` |
 | Go type | `*events.LockCreate` |
-| When fired | A Teleport lock is created, suspending a user |
+| When fired | A Teleport lock is created that targets a user |
 | C1 events emitted | 1 `ResourceChangeEvent` (user) |
 | Guard | Skipped if lock target has no `User` set |
 
 **Behavior:**
-- Only **user** targets are handled: `Get()` on a user surfaces `IsLocked` as `STATUS_DISABLED`.
+- Only **user** targets are handled: the event emits a `ResourceChangeEvent` for that user, so C1 re-reads the user with `Get()`.
+- The re-read reflects only the Teleport login lockout (`IsLocked`). A lock resource, such as one that `lock_user` or `tctl lock` creates, does not set `IsLocked`, so the reported status does not change.
 - Role targets are ignored because the role resource has no lock/status field — `Get()` returns nothing new.
 - Locks targeting nodes, logins, MFA devices, etc. are silently ignored (we don't model those).
 
@@ -217,13 +218,13 @@ Teleport access requests use multiple event types for the request lifecycle. All
 |-------|-------|
 | Teleport event string | `lock.deleted` |
 | Go type | `*events.LockDelete` |
-| When fired | A Teleport lock is **removed**, re-enabling the user |
+| When fired | A Teleport lock that targets a user is **removed** |
 | C1 events emitted | 1 `ResourceChangeEvent` (user) |
 | Guard | Skipped if lock target has no `User` set |
 
 **Behavior:**
 - Same logic as `lock.created` — only user targets are handled.
-- After the lock is removed, `Get()` returns the user with `IsLocked=false` → `STATUS_ENABLED`.
+- C1 re-reads the user with `Get()`. The result reflects only the login lockout (`IsLocked`), so removing a lock resource does not change the reported status.
 - Unlike other delete events (e.g. `user.delete`), `lock.deleted` is safe to handle because it deletes the **lock**, not the user. The user still exists and `Get()` returns them successfully.
 
 ---
@@ -282,8 +283,8 @@ Resource delete events (`user.delete`, `role.deleted`, `app.delete`, `db.delete`
 | `access_request.review` | — | Per role (if APPROVED) | — | Resolves original request by ID |
 | `access_request.update` | — | Per role (if APPROVED) | — | State transition |
 | `access_request.expire` | — | — | Per role (if EXPIRED) | Temporary access revoked |
-| `lock.created` | User | — | — | User locked → `STATUS_DISABLED` |
-| `lock.deleted` | User | — | — | User unlocked → `STATUS_ENABLED` |
+| `lock.created` | User | — | — | Re-reads the user; status reflects only the login lockout |
+| `lock.deleted` | User | — | — | Re-reads the user; status reflects only the login lockout |
 | `user.login` | — | — | — | Emitted as `UsageEvent` (separate feed) |
 | ~~`*.delete`~~ | — | — | — | **Not handled** — deletions reconciled by full sync |
 | ~~`access_request.create`~~ | — | — | — | **Not handled** — request is just PENDING |

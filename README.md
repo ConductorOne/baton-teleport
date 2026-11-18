@@ -35,6 +35,18 @@ Check out [Baton](https://github.com/conductorone/baton) to learn more about the
 
 - Supports entitlements provisioning between users and roles
 
+- Connector actions (usable from a ConductorOne automation "connector action" step):
+  - `lock_user`: locks a Teleport user. A lock rejects new requests and terminates active sessions. Arguments: `user` (required, Teleport username), `duration` (optional positive Go duration such as `30m` or `24h`; a bare number is read as seconds; days are not supported; omit for a lock that never expires), `message` (optional, shown to the locked-out user). The user must exist. Each call creates a new lock named `c1-<uuid>`. Repeated calls create separate locks, each with its own expiry. The user stays blocked until the last non-expired lock expires or is removed. The action refuses to lock the connector's own Teleport user (the user the connector authenticates as). It fails closed: if the connector cannot determine its own user, it returns an error and creates no lock. Returns `lock_name` and `expires` (RFC3339, empty if the lock does not expire).
+  - `unlock_user`: deletes every non-expired lock whose target is exactly the given user. This applies whatever the lock name or creator is, including locks that people created with `tctl`. Expired locks are ignored. Locks on roles, devices or compound targets (for example user and role) are not deleted. The user does not need to exist. The connector logs the name of each deleted lock. Returns `deleted_locks` (number) and `deleted_lock_names` (list of names).
+  - User status: the user resource status reflects only the Teleport login lockout (`user.status.is_locked`), which Teleport sets after repeated failed logins. It does not reflect locks that `lock_user` creates, or any other Teleport lock resource. A user that is locked with `lock_user` still syncs as enabled.
+  - Locking requires Teleport Enterprise (Identity Governance) and the connector identity needs a role with:
+    ```yaml
+    rules:
+      - resources: [lock]
+        verbs: [list, create, read, update, delete]
+    ```
+    plus read access to `user`. Example arguments: `{"user": "jane-doe", "duration": "24h", "message": "Locked pending investigation"}`.
+
 - Support account provisioning:
   IMPORTANT NOTE: Due to Teleport's security rules, it is not possible to auto-generate and assign passwords to newly created users.
   Therefore, when a new user is created from ConductorOne, a password reset link (associated with a token) will be sent to a vault.

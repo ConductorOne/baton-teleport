@@ -2,6 +2,8 @@ package client
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"strings"
 	"time"
@@ -9,12 +11,15 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	teleport "github.com/gravitational/teleport/api/client"
 	"github.com/gravitational/teleport/api/client/proto"
+	"github.com/gravitational/teleport/api/identityfile"
 	"github.com/gravitational/teleport/api/types"
 )
 
 type TeleportClient struct {
 	*teleport.Client
 	ProxyAddress string
+
+	identityCN string
 }
 
 var ErrNoKeyProvided = errors.New("no key provided")
@@ -36,8 +41,14 @@ func New(ctx context.Context, proxyAddress, keyFile, key string) (*TeleportClien
 	switch {
 	case keyFile != "":
 		creds = teleport.LoadIdentityFile(keyFile)
+		if idFile, err := identityfile.ReadFile(keyFile); err == nil {
+			tc.identityCN = certCommonName(idFile.Certs.TLS)
+		}
 	case key != "":
 		creds = teleport.LoadIdentityFileFromString(key)
+		if idFile, err := identityfile.FromString(key); err == nil {
+			tc.identityCN = certCommonName(idFile.Certs.TLS)
+		}
 	default:
 		return nil, ErrNoKeyProvided
 	}
@@ -52,6 +63,22 @@ func New(ctx context.Context, proxyAddress, keyFile, key string) (*TeleportClien
 
 	tc.Client = client
 	return tc, nil
+}
+
+func (t *TeleportClient) IdentityCommonName() string {
+	return t.identityCN
+}
+
+func certCommonName(certPEM []byte) string {
+	block, _ := pem.Decode(certPEM)
+	if block == nil {
+		return ""
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return ""
+	}
+	return cert.Subject.CommonName
 }
 
 func hasPort(address string) bool {
