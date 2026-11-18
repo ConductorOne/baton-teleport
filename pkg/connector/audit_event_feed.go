@@ -363,8 +363,9 @@ func makeCreateRevokeEvent(id string, t time.Time, roleName, userName string) *v
 }
 
 // convertLockEvent emits a ResourceChangeEvent for the user targeted by a
-// Teleport lock (create or delete). C1 calls Get() on the user, which
-// surfaces IsLocked as STATUS_DISABLED (locked) or STATUS_ENABLED (unlocked).
+// Teleport lock (create or delete). C1 calls Get() on the user. The status
+// reflects only the login lockout (IsLocked), so a lock resource does not
+// change it.
 //
 // Role targets are ignored: the role resource has no lock/status field, so
 // a ResourceChangeEvent would trigger a Get() that discovers nothing new.
