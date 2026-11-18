@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/google/uuid"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/trace"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
@@ -37,7 +39,8 @@ const (
 // lockAPI is the subset of the Teleport client used by the lock actions.
 type lockAPI interface {
 	GetUser(ctx context.Context, name string, withSecrets bool) (types.User, error)
-	GetLock(ctx context.Context, name string) (types.Lock, error)
+	GetCurrentUser(ctx context.Context) (types.User, error)
+	IdentityCommonName() string
 	UpsertLock(ctx context.Context, lock types.Lock) error
 	DeleteLock(ctx context.Context, name string) error
 	ListLocks(ctx context.Context, limit int, startKey string, filter *types.LockFilter) ([]types.Lock, string, error)
@@ -49,6 +52,9 @@ var _ lockAPI = (*client.TeleportClient)(nil)
 type lockActions struct {
 	api lockAPI
 	now func() time.Time
+
+	ownMu    sync.Mutex
+	ownUsers map[string]struct{}
 }
 
 // GlobalActions registers the connector's global actions.
@@ -88,8 +94,9 @@ func lockUserSchema() *v2.BatonActionSchema {
 		Name:        lockUserActionName,
 		DisplayName: "Lock Teleport user",
 		Description: "Locks a Teleport user so that new requests are rejected and active sessions are terminated. " +
-			"The lock is named c1-<username>. Repeat calls reuse that lock and never shorten it. " +
-			"The lock stays in force until it expires or is removed with unlock_user.",
+			"Each call creates a new lock named c1-<uuid>, so repeat calls create separate locks with their own expiry. " +
+			"The user stays blocked until the last non-expired lock expires or is removed with unlock_user. " +
+			"The action refuses to lock the connector's own Teleport user.",
 		Arguments: []*config.Field{
 			userArgField(),
 			stringArgField(argDuration, "Duration",
@@ -214,6 +221,9 @@ func (l *lockActions) lockUser(ctx context.Context, args *structpb.Struct) (*str
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := l.refuseOwnUser(ctx, user); err != nil {
+		return nil, nil, err
+	}
 	if _, err := l.api.GetUser(ctx, user, false); err != nil {
 		if trace.IsNotFound(err) {
 			return nil, nil, fmt.Errorf("baton-teleport: user %q not found: %w", user, err)
@@ -225,34 +235,18 @@ func (l *lockActions) lockUser(ctx context.Context, args *structpb.Struct) (*str
 		message = defaultLockMessage
 	}
 
-	target := types.LockTarget{User: user}
 	spec := types.LockSpecV2{
-		Target:  target,
+		Target:  types.LockTarget{User: user},
 		Message: message,
 	}
-	now := l.now()
-	var requested *time.Time
+	var expires *time.Time
 	if hasDuration {
-		t := now.UTC().Add(d)
+		t := l.now().UTC().Add(d)
 		spec.Expires = &t
-		requested = &t
+		expires = &t
 	}
 
-	name := lockNamePrefix + user
-	existing, err := l.api.GetLock(ctx, name)
-	switch {
-	case err == nil:
-		if !existing.Target().Equals(target) {
-			return nil, nil, fmt.Errorf("baton-teleport: lock %q already exists with a different target and was not modified", name)
-		}
-		if lockCoversRequest(existing, requested, now) {
-			return lockUserResult(name, existing.LockExpiry()), nil, nil
-		}
-	case trace.IsNotFound(err):
-	default:
-		return nil, nil, wrapAPIError(err, "failed to get lock %q", name)
-	}
-
+	name := lockNamePrefix + uuid.NewString()
 	lock, err := types.NewLock(name, spec)
 	if err != nil {
 		return nil, nil, fmt.Errorf("baton-teleport: failed to build lock for user %q: %w", user, err)
@@ -261,21 +255,36 @@ func (l *lockActions) lockUser(ctx context.Context, args *structpb.Struct) (*str
 		return nil, nil, wrapAPIError(err, "failed to lock user %q", user)
 	}
 
-	return lockUserResult(name, requested), nil, nil
+	return lockUserResult(name, expires), nil, nil
 }
 
-func lockCoversRequest(existing types.Lock, requested *time.Time, now time.Time) bool {
-	current := existing.LockExpiry()
-	if current == nil {
-		return true
+func (l *lockActions) ownUsernames(ctx context.Context) (map[string]struct{}, error) {
+	l.ownMu.Lock()
+	defer l.ownMu.Unlock()
+	if l.ownUsers != nil {
+		return l.ownUsers, nil
 	}
-	if !current.After(now) {
-		return false
+	current, err := l.api.GetCurrentUser(ctx)
+	if err != nil {
+		return nil, err
 	}
-	if requested == nil {
-		return false
+	names := map[string]struct{}{current.GetName(): {}}
+	if cn := l.api.IdentityCommonName(); cn != "" {
+		names[cn] = struct{}{}
 	}
-	return !current.Before(*requested)
+	l.ownUsers = names
+	return names, nil
+}
+
+func (l *lockActions) refuseOwnUser(ctx context.Context, user string) error {
+	own, err := l.ownUsernames(ctx)
+	if err != nil {
+		return wrapAPIError(err, "refusing to lock %q: cannot determine the connector's own Teleport user", user)
+	}
+	if _, ok := own[user]; ok {
+		return fmt.Errorf("baton-teleport: refusing to lock %s: it is the connector's own Teleport user; locking it would block the connector credential", user)
+	}
+	return nil
 }
 
 func lockUserResult(name string, expiry *time.Time) *structpb.Struct {

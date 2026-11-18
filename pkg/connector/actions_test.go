@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strconv"
 	"testing"
 	"time"
@@ -16,18 +17,35 @@ import (
 )
 
 type fakeLockAPI struct {
-	users      map[string]bool
-	getErr     error
-	upsertErr  error
-	locks      []types.Lock
-	byName     map[string]types.Lock
-	getLockErr error
-	pageSize   int
-	listErr    error
-	deleteErr  map[string]error
-	upserted   []types.Lock
-	deleted    []string
-	getCalls   int
+	users     map[string]bool
+	getErr    error
+	upsertErr error
+	locks     []types.Lock
+	pageSize  int
+	listErr   error
+	deleteErr map[string]error
+	upserted  []types.Lock
+	deleted   []string
+	getCalls  int
+
+	currentUser    string
+	currentUserErr error
+	identityCN     string
+}
+
+func (f *fakeLockAPI) GetCurrentUser(_ context.Context) (types.User, error) {
+	if f.currentUserErr != nil {
+		return nil, f.currentUserErr
+	}
+	name := f.currentUser
+	if name == "" {
+		name = "connector-svc"
+	}
+	return types.NewUser(name)
+}
+
+func (f *fakeLockAPI) IdentityCommonName() string {
+	return f.identityCN
 }
 
 func (f *fakeLockAPI) GetUser(_ context.Context, name string, _ bool) (types.User, error) {
@@ -39,16 +57,6 @@ func (f *fakeLockAPI) GetUser(_ context.Context, name string, _ bool) (types.Use
 		return nil, trace.NotFound("user %q not found", name)
 	}
 	return types.NewUser(name)
-}
-
-func (f *fakeLockAPI) GetLock(_ context.Context, name string) (types.Lock, error) {
-	if f.getLockErr != nil {
-		return nil, f.getLockErr
-	}
-	if l, ok := f.byName[name]; ok {
-		return l, nil
-	}
-	return nil, trace.NotFound("lock %q not found", name)
 }
 
 func (f *fakeLockAPI) UpsertLock(_ context.Context, l types.Lock) error {
@@ -157,13 +165,6 @@ func TestLockUser(t *testing.T) {
 			wantErr: "missing lock RBAC",
 		},
 		{name: "access denied on get user", args: map[string]any{"user": "alice"}, api: &fakeLockAPI{getErr: trace.AccessDenied("nope")}, wantErr: "missing lock RBAC"},
-		{name: "get lock error", args: map[string]any{"user": "alice"}, api: &fakeLockAPI{users: map[string]bool{"alice": true}, getLockErr: errors.New("boom")}, wantErr: "failed to get lock"},
-		{
-			name:    "get lock access denied",
-			args:    map[string]any{"user": "alice"},
-			api:     &fakeLockAPI{users: map[string]bool{"alice": true}, getLockErr: trace.AccessDenied("nope")},
-			wantErr: "missing lock RBAC",
-		},
 		{name: "upsert error", args: map[string]any{"user": "alice"}, api: &fakeLockAPI{users: map[string]bool{"alice": true}, upsertErr: errors.New("denied")}, wantErr: "failed to lock user"},
 	}
 	for _, tt := range tests {
@@ -187,116 +188,96 @@ func TestLockUser(t *testing.T) {
 				require.True(t, tt.wantExpires.Equal(*l.LockExpiry()))
 			}
 			require.True(t, out.GetFields()["success"].GetBoolValue())
-			require.Equal(t, "c1-alice", l.GetName())
+			require.Regexp(t, lockNameRegexp, l.GetName())
 			require.Equal(t, l.GetName(), out.GetFields()["lock_name"].GetStringValue())
 		})
 	}
 }
 
-func TestLockUserDeterministicNameKeepsUsernameVerbatim(t *testing.T) {
-	user := "Jane.Doe+test@example.com"
-	api := &fakeLockAPI{users: map[string]bool{user: true}}
+var lockNameRegexp = regexp.MustCompile(`^c1-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+func TestLockUserCreatesDistinctLocks(t *testing.T) {
+	api := &fakeLockAPI{users: map[string]bool{"alice": true}}
 	la := &lockActions{api: api, now: func() time.Time { return lockTestNow }}
-	out, _, err := la.lockUser(context.Background(), newArgs(t, map[string]any{"user": user}))
+	first, _, err := la.lockUser(context.Background(), newArgs(t, map[string]any{"user": "alice", "duration": "1h"}))
 	require.NoError(t, err)
-	require.Len(t, api.upserted, 1)
-	require.Equal(t, "c1-"+user, api.upserted[0].GetName())
-	require.Equal(t, "c1-"+user, out.GetFields()["lock_name"].GetStringValue())
+	second, _, err := la.lockUser(context.Background(), newArgs(t, map[string]any{"user": "alice", "duration": "2h"}))
+	require.NoError(t, err)
+	require.Len(t, api.upserted, 2)
+	require.NotEqual(t, api.upserted[0].GetName(), api.upserted[1].GetName())
+	require.Regexp(t, lockNameRegexp, api.upserted[0].GetName())
+	require.Regexp(t, lockNameRegexp, api.upserted[1].GetName())
+	require.Equal(t, api.upserted[0].GetName(), first.GetFields()["lock_name"].GetStringValue())
+	require.Equal(t, api.upserted[1].GetName(), second.GetFields()["lock_name"].GetStringValue())
+	require.Equal(t, lockTestNow.Add(time.Hour).Format(time.RFC3339), first.GetFields()["expires"].GetStringValue())
+	require.Equal(t, lockTestNow.Add(2*time.Hour).Format(time.RFC3339), second.GetFields()["expires"].GetStringValue())
 }
 
-func TestLockUserExistingLock(t *testing.T) {
-	alice := types.LockTarget{User: "alice"}
-	later := lockTestNow.Add(10 * time.Hour)
-	earlier := lockTestNow.Add(1 * time.Hour)
-	past := lockTestNow.Add(-1 * time.Hour)
+func TestLockUserSelfLockGuard(t *testing.T) {
 	tests := []struct {
 		name        string
-		existing    types.Lock
-		args        map[string]any
+		user        string
+		api         *fakeLockAPI
 		wantErr     string
-		wantUpsert  bool
-		wantExpires string
+		wantLocked  bool
+		wantGetUser int
 	}{
+		{name: "own user refused", user: "svc", api: &fakeLockAPI{currentUser: "svc", users: map[string]bool{"svc": true}}, wantErr: "refusing to lock svc"},
+		{name: "different user allowed", user: "alice", api: &fakeLockAPI{currentUser: "svc", users: map[string]bool{"alice": true}}, wantLocked: true, wantGetUser: 1},
+		{name: "case differing name allowed", user: "SVC", api: &fakeLockAPI{currentUser: "svc", users: map[string]bool{"SVC": true}}, wantLocked: true, wantGetUser: 1},
 		{
-			name:        "unexpired lock with later expiry is returned unchanged",
-			existing:    mustLockExpiring(t, "c1-alice", alice, &later),
-			args:        map[string]any{"user": "alice", "duration": "2h"},
-			wantExpires: later.Format(time.RFC3339),
+			name:    "current user error fails closed",
+			user:    "alice",
+			api:     &fakeLockAPI{currentUserErr: errors.New("boom"), users: map[string]bool{"alice": true}},
+			wantErr: "cannot determine the connector's own Teleport user",
 		},
 		{
-			name:        "unexpired lock with equal expiry is returned unchanged",
-			existing:    mustLockExpiring(t, "c1-alice", alice, ptr(lockTestNow.Add(2*time.Hour))),
-			args:        map[string]any{"user": "alice", "duration": "2h"},
-			wantExpires: lockTestNow.Add(2 * time.Hour).Format(time.RFC3339),
+			name:    "current user access denied fails closed with hint",
+			user:    "alice",
+			api:     &fakeLockAPI{currentUserErr: trace.AccessDenied("nope"), users: map[string]bool{"alice": true}},
+			wantErr: "missing lock RBAC",
 		},
 		{
-			name:        "lock without expiry is never shortened",
-			existing:    mustLockExpiring(t, "c1-alice", alice, nil),
-			args:        map[string]any{"user": "alice", "duration": "2h"},
-			wantExpires: "",
-		},
-		{
-			name:        "lock without expiry stays when no duration requested",
-			existing:    mustLockExpiring(t, "c1-alice", alice, nil),
-			args:        map[string]any{"user": "alice"},
-			wantExpires: "",
-		},
-		{
-			name:        "earlier expiry is extended",
-			existing:    mustLockExpiring(t, "c1-alice", alice, &earlier),
-			args:        map[string]any{"user": "alice", "duration": "2h", "message": "again"},
-			wantUpsert:  true,
-			wantExpires: lockTestNow.Add(2 * time.Hour).Format(time.RFC3339),
-		},
-		{
-			name:        "expiring lock becomes permanent when no duration requested",
-			existing:    mustLockExpiring(t, "c1-alice", alice, &later),
-			args:        map[string]any{"user": "alice"},
-			wantUpsert:  true,
-			wantExpires: "",
-		},
-		{
-			name:        "expired lock is replaced",
-			existing:    mustLockExpiring(t, "c1-alice", alice, &past),
-			args:        map[string]any{"user": "alice", "duration": "30m"},
-			wantUpsert:  true,
-			wantExpires: lockTestNow.Add(30 * time.Minute).Format(time.RFC3339),
-		},
-		{
-			name:     "different target is a conflict",
-			existing: mustLockExpiring(t, "c1-alice", types.LockTarget{User: "alice", Role: "admin"}, nil),
-			args:     map[string]any{"user": "alice"},
-			wantErr:  "different target",
-		},
-		{
-			name:     "other user target is a conflict",
-			existing: mustLockExpiring(t, "c1-alice", types.LockTarget{User: "bob"}, nil),
-			args:     map[string]any{"user": "alice"},
-			wantErr:  "different target",
+			name:    "certificate common name match refused",
+			user:    "cert-svc",
+			api:     &fakeLockAPI{currentUser: "svc", identityCN: "cert-svc", users: map[string]bool{"cert-svc": true}},
+			wantErr: "connector's own Teleport user",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			api := &fakeLockAPI{users: map[string]bool{"alice": true}, byName: map[string]types.Lock{"c1-alice": tt.existing}}
-			la := &lockActions{api: api, now: func() time.Time { return lockTestNow }}
-			out, _, err := la.lockUser(context.Background(), newArgs(t, tt.args))
+			la := &lockActions{api: tt.api, now: func() time.Time { return lockTestNow }}
+			_, _, err := la.lockUser(context.Background(), newArgs(t, map[string]any{"user": tt.user}))
+			require.Equal(t, tt.wantGetUser, tt.api.getCalls)
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
-				require.Empty(t, api.upserted)
+				require.Empty(t, tt.api.upserted)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, "c1-alice", out.GetFields()["lock_name"].GetStringValue())
-			require.Equal(t, tt.wantExpires, out.GetFields()["expires"].GetStringValue())
-			if !tt.wantUpsert {
-				require.Empty(t, api.upserted)
-				return
-			}
-			require.Len(t, api.upserted, 1)
-			require.Equal(t, "c1-alice", api.upserted[0].GetName())
-			require.Equal(t, tt.args["message"] != nil, api.upserted[0].Message() == "again")
+			require.Len(t, tt.api.upserted, 1)
 		})
 	}
+}
+
+func TestOwnUserResolvedOnce(t *testing.T) {
+	api := &countingCurrentUserAPI{fakeLockAPI: fakeLockAPI{users: map[string]bool{"alice": true}}}
+	la := &lockActions{api: api, now: func() time.Time { return lockTestNow }}
+	for i := 0; i < 3; i++ {
+		_, _, err := la.lockUser(context.Background(), newArgs(t, map[string]any{"user": "alice"}))
+		require.NoError(t, err)
+	}
+	require.Equal(t, 1, api.currentCalls)
+}
+
+type countingCurrentUserAPI struct {
+	fakeLockAPI
+	currentCalls int
+}
+
+func (c *countingCurrentUserAPI) GetCurrentUser(ctx context.Context) (types.User, error) {
+	c.currentCalls++
+	return c.fakeLockAPI.GetCurrentUser(ctx)
 }
 
 func ptr[T any](v T) *T { return &v }
